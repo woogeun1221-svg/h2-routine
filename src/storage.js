@@ -32,11 +32,15 @@ export function validateState(obj) {
 }
 
 export function load(today) {
+  var raw = null;
   try {
-    var state = JSON.parse(localStorage.getItem(STORE_KEY));
+    raw = localStorage.getItem(STORE_KEY);
+    var state = JSON.parse(raw);
     if (validateState(state)) throw new Error('invalid');
     return state;
   } catch (e) {
+    // 손상된 원본을 덮어쓰기 전에 보존 — 수개월치 기록의 마지막 복구 경로
+    if (raw) { try { localStorage.setItem(STORE_KEY + '.bak', raw); } catch (e2) {} }
     return freshState(today);
   }
 }

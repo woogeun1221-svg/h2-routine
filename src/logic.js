@@ -73,6 +73,96 @@ export function monthFullRate(state, today) {
   return Math.round(full / total * 100);
 }
 
+/* 최장 스트릭 — 어제까지 확정 + 오늘이 최소 이상이면 포함 (현재 스트릭과 동일 규칙이라
+   항상 최장 ≥ 현재가 보장됨). */
+export function longestStreak(state, today) {
+  var days = [], cur = state.startDate, yest = shift(today, -1);
+  while (cur <= yest) { days.push(cur); cur = shift(cur, 1); }
+  if (today >= state.startDate && statusOf(state, today) !== 'miss') days.push(today);
+  var best = 0, run = 0;
+  for (var i = 0; i < days.length; i++) {
+    if (statusOf(state, days[i]) === 'miss') run = 0;
+    else { run++; if (run > best) best = run; }
+  }
+  return best;
+}
+
+/* ---------- 월 단위 헬퍼 (추이 화면) ---------- */
+export function shiftMonth(ym, n) {
+  var t = (+ym.slice(0, 4)) * 12 + (+ym.slice(5, 7) - 1) + n;
+  var y = Math.floor(t / 12), m = t % 12 + 1;
+  return y + '-' + ('0' + m).slice(-2);
+}
+
+export function daysInMonth(ym) {
+  return new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate();
+}
+
+/* startDate가 속한 월부터 오늘이 속한 월까지, 오름차순 'YYYY-MM' 목록 */
+export function monthList(state, today) {
+  var list = [], cur = state.startDate.slice(0, 7), end = today.slice(0, 7);
+  while (cur <= end) { list.push(cur); cur = shiftMonth(cur, 1); }
+  return list;
+}
+
+/* 캘린더 히트맵 데이터. kind:
+   'out'    = startDate 이전 (표시 안 함)
+   'future' = 오늘 이후
+   'pending'= 오늘인데 아직 아무 기록 없음 (진행중 — 미달 아님, v1 스트립과 동일 규칙)
+   'full'|'min'|'miss' = 확정 상태 (오늘도 기록이 있으면 현재 상태로 표시)
+   lead = 1일의 요일(0=일) — 첫 줄 공백 칸 수 */
+export function calMonth(state, ym, today) {
+  var p = (ym + '-01').split('-');
+  var lead = new Date(+p[0], +p[1] - 1, 1).getDay();
+  var n = daysInMonth(ym);
+  var cells = [];
+  for (var d = 1; d <= n; d++) {
+    var ds = ym + '-' + ('0' + d).slice(-2);
+    var kind;
+    if (ds < state.startDate) kind = 'out';
+    else if (ds > today) kind = 'future';
+    else if (ds === today) {
+      var recorded = completion(state, ds) > 0 || getDay(state, ds).w;
+      kind = recorded ? statusOf(state, ds) : 'pending';
+    } else kind = statusOf(state, ds);
+    cells.push({ ds: ds, day: d, kind: kind });
+  }
+  return { lead: lead, cells: cells };
+}
+
+/* 습관별 월간 통계 — 해당 월 안에서 startDate부터 어제까지(확정분만).
+   습관별로 자기 목표 기준 정상/최소/미달 일수, 누적 합, 달성률.
+   송은은 o/x/na 일수. total=0이면 표본 없음. */
+export function habitMonthStats(state, ym, today) {
+  var monthStart = ym + '-01';
+  var from = monthStart > state.startDate ? monthStart : state.startDate;
+  var monthEnd = ym + '-' + ('0' + daysInMonth(ym)).slice(-2);
+  var yest = shift(today, -1);
+  var to = monthEnd < yest ? monthEnd : yest;
+  var habits = HABITS.map(function (h) {
+    return { key: h.key, name: h.name, unit: h.unit, full: 0, min: 0, miss: 0, sum: 0 };
+  });
+  var w = { o: 0, x: 0, na: 0 }, total = 0, cur = from;
+  while (cur <= to) {
+    total++;
+    var d = getDay(state, cur);
+    for (var i = 0; i < HABITS.length; i++) {
+      var h = HABITS[i], hs = habits[i], v = d[h.key] || 0;
+      hs.sum += v;
+      if (v >= h.target) hs.full++;
+      else if (v >= h.min) hs.min++;
+      else hs.miss++;
+    }
+    if (d.w === 'o') w.o++; else if (d.w === 'x') w.x++; else w.na++;
+    cur = shift(cur, 1);
+  }
+  for (var j = 0; j < habits.length; j++) {
+    habits[j].fullRate = total ? Math.round(habits[j].full / total * 100) : null;
+    habits[j].minRate = total ? Math.round((habits[j].full + habits[j].min) / total * 100) : null;
+  }
+  return { total: total, habits: habits, w: w };
+}
+
 /* 월별 장부 — startDate부터 어제까지, 최신 월부터. */
 export function monthlyRows(state, today) {
   var yest = shift(today, -1);

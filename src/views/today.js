@@ -1,8 +1,8 @@
-/* 오늘 화면 렌더 — v1의 render/renderCards/renderStrip/renderMonthly 1:1 이식.
+/* 오늘 화면 렌더 — v1의 render/renderCards/renderStrip 1:1 이식 (월별 장부는 추이 화면으로 이동).
    h(핸들러): { addVal, undoVal, setDirect, toggleW, undoStack } — 값 변경은 전부 main.js가 소유. */
 import {
   HABITS, WIFE, shift, daysBetween, weekday,
-  getDay, statusOf, completion, streak, monthFullRate, monthlyRows
+  getDay, statusOf, completion, streak, monthFullRate
 } from '../logic.js';
 
 export function renderToday(state, t, h) {
@@ -20,7 +20,6 @@ export function renderToday(state, t, h) {
 
   renderCards(state, t, h);
   renderStrip(state, t);
-  renderMonthly(state, t);
 }
 
 function renderCards(state, t, h) {
@@ -127,19 +126,4 @@ function renderStrip(state, t) {
     cell.appendChild(slot); cell.appendChild(lb);
     wrap.appendChild(cell);
   }
-}
-
-function renderMonthly(state, t) {
-  var rows = monthlyRows(state, t);
-  var sec = document.getElementById('monthSection');
-  if (rows.length === 0) { sec.style.display = 'none'; return; }
-  sec.style.display = 'block';
-  var tb = document.getElementById('monthBody'); tb.innerHTML = '';
-  rows.forEach(function (r) {
-    var tr = document.createElement('tr');
-    tr.innerHTML = '<td>' + r.label + '</td><td class="c-full">' + r.full + '</td>' +
-      '<td class="c-min">' + r.min + '</td><td class="c-miss">' + r.miss + '</td>' +
-      '<td class="c-rate">' + r.rate + '%</td>';
-    tb.appendChild(tr);
-  });
 }

@@ -13,6 +13,8 @@ SHA=$(git rev-parse --short HEAD)
 
 cd dist
 rm -rf .git
+# Jekyll 처리를 끔 — 없으면 `_` 프리픽스 산출물이 서빙에서 빠져 SW precache가 조용히 실패한다
+touch .nojekyll
 git init -b gh-pages -q
 git add -A
 git commit -q -m "deploy ${SHA}"

@@ -43,14 +43,6 @@ describe('renderToday DOM 스모크', () => {
     expect(document.getElementById('banner').className).not.toContain('show');
   });
 
-  it('기록이 어제까지 있으면 월별 장부 표시', () => {
-    const state = { startDate: '2026-07-20', days: { '2026-07-20': FULL, '2026-07-21': FULL } };
-    renderToday(state, '2026-07-22', handlers);
-    expect(document.getElementById('monthSection').style.display).toBe('block');
-    expect(document.querySelectorAll('#monthBody tr').length).toBe(1);
-    expect(document.querySelector('#monthBody td.c-rate').textContent).toBe('100%');
-  });
-
   it('송은 X면 오늘 캔들이 미달색', () => {
     const state = { startDate: '2026-07-01', days: { '2026-07-22': { ...FULL, w: 'x' } } };
     renderToday(state, '2026-07-22', handlers);

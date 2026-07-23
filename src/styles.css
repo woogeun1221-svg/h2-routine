@@ -24,10 +24,18 @@ body {
   display: flex;
   justify-content: center;
 }
+/* 상태바 스크림 — black-translucent라 콘텐츠가 시계·배터리 밑을 지나가므로 (탭바와 대칭) */
+body::before {
+  content: ''; position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+  height: env(safe-area-inset-top);
+  background: rgba(15,19,23,.88);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
 .mono { font-family: 'IBM Plex Mono', monospace; }
 .app {
   width: 100%; max-width: 440px;
-  padding: calc(22px + env(safe-area-inset-top)) 18px calc(40px + env(safe-area-inset-bottom));
+  /* 하단은 고정 탭바(≈54px)를 넘겨서 확보 */
+  padding: calc(22px + env(safe-area-inset-top)) 18px calc(96px + env(safe-area-inset-bottom));
 }
 
 /* ---------- header ---------- */
@@ -71,7 +79,9 @@ h1.date .dplus { font-size: 13px; font-weight: 600; color: var(--faint); margin-
 .card-sub { font-size: 11px; color: var(--faint); margin-left: 7px; font-weight: 400; }
 .card-val {
   font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 700;
-  cursor: pointer; border: none; background: none; color: var(--text); padding: 0;
+  cursor: pointer; border: none; background: none; color: var(--text);
+  /* 렌더 위치는 v1 그대로, 터치 영역만 44px급으로 확장 */
+  padding: 10px 0 10px 14px; margin: -10px 0 -10px -14px;
 }
 .card-val .of { font-size: 12px; font-weight: 600; color: var(--faint); }
 .card-val:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 4px; }
@@ -169,3 +179,80 @@ footer { margin-top: 30px; text-align: center; display: flex; justify-content: c
   font-family: inherit; cursor: pointer; text-decoration: underline; padding: 8px;
 }
 .loading { margin-top: 40vh; text-align: center; color: var(--faint); font-size: 13px; }
+
+/* ---------- bottom tab bar ---------- */
+.tabbar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+  display: flex; justify-content: center;
+  background: rgba(23,29,36,.94);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line);
+  padding: 4px 0 calc(4px + env(safe-area-inset-bottom));
+}
+.tabbar .tab {
+  flex: 0 1 130px; min-height: 46px;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--faint); cursor: pointer;
+  font-family: 'IBM Plex Sans KR', sans-serif; font-size: 13px; font-weight: 600;
+  letter-spacing: .08em;
+}
+.tabbar .tab.active { color: var(--text); border-bottom-color: var(--red); }
+.tabbar .tab:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+
+/* ---------- trends: calendar heatmap ---------- */
+.cal-section { margin-top: 18px; }
+.cal-card {
+  margin-top: 12px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 12px 12px 14px;
+}
+.cal-head { display: flex; align-items: center; justify-content: space-between; }
+.cal-label { font-size: 16px; font-weight: 700; letter-spacing: .02em; }
+.btn.cal-nav { flex: 0 0 48px; min-height: 44px; font-size: 11px; color: var(--muted); }
+.btn.cal-nav:disabled { opacity: .3; cursor: default; }
+.cal-wd {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;
+  margin-top: 12px; text-align: center;
+  font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--faint);
+}
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-top: 8px; }
+.cal-cell {
+  aspect-ratio: 1; border-radius: 6px; background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--faint);
+}
+.cal-cell.full { background: var(--red); color: rgba(15,19,23,.85); font-weight: 700; }
+.cal-cell.min  { background: var(--brass); color: rgba(15,19,23,.85); font-weight: 700; }
+.cal-cell.miss { background: var(--blue); color: rgba(15,19,23,.85); font-weight: 700; }
+.cal-cell.pending { color: var(--text); }
+.cal-cell.today { outline: 1.5px solid var(--faint); outline-offset: 1.5px; }
+.cal-cell.future { opacity: .35; }
+.cal-cell.out { visibility: hidden; }
+
+/* ---------- trends: habit stats ---------- */
+.habit-section { margin-top: 24px; }
+.habit-section .ledger-wrap { margin-top: 12px; }
+table.ledger.compact th, table.ledger.compact td { padding: 9px 8px; }
+table.ledger.compact th:first-child, table.ledger.compact td:first-child { padding-left: 13px; }
+table.ledger.compact th:last-child, table.ledger.compact td:last-child { padding-right: 13px; }
+td.empty { text-align: center !important; color: var(--faint); font-family: 'IBM Plex Sans KR', sans-serif; }
+.table-note { margin-top: 8px; padding: 0 3px; font-size: 11px; line-height: 1.6; color: var(--faint); }
+.wife-line { margin-top: 10px; padding: 0 3px; font-size: 12px; color: var(--muted); }
+.wife-line b { font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+.wife-line .wo { color: var(--red); }
+.wife-line .wx { color: var(--blue); }
+.wife-line .wife-note { color: var(--faint); font-size: 11px; }
+
+/* ---------- settings ---------- */
+.settings-section { margin-top: 18px; }
+.settings-btns { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.settings-btns .btn {
+  flex: none; font-family: 'IBM Plex Sans KR', sans-serif; font-size: 13px;
+  text-align: left; padding: 0 15px;
+}
+.settings-btns .btn.danger { color: var(--blue); border-color: rgba(91,141,239,.4); }
+.settings-info {
+  margin-top: 18px; font-size: 12px; line-height: 2; color: var(--faint);
+  border-left: 2px solid var(--line); padding-left: 12px;
+}
+.settings-info b { color: var(--muted); font-weight: 600; }
+.settings-todo { color: var(--faint); font-style: normal; opacity: .8; }
