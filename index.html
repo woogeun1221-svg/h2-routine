@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1317">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="H2 루틴">
+<link rel="icon" href="/h2-routine/icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/h2-routine/icons/apple-touch-icon.png">
+<title>H2 강제 루틴</title>
+  <script type="module" crossorigin src="/h2-routine/assets/index-BAarydIq.js"></script>
+  <link rel="stylesheet" crossorigin href="/h2-routine/assets/index-DzvuTEjk.css">
+<link rel="manifest" href="/h2-routine/manifest.webmanifest"></head>
+<body>
+<div class="app">
+  <div id="loading" class="loading">불러오는 중…</div>
+
+  <div id="main" style="display:none">
+    <div class="eyebrow">
+      <span>H2 강제 루틴 — 지덕체</span>
+      <span class="save-state" id="saveState"></span>
+    </div>
+
+    <!-- ================= 오늘 ================= -->
+    <div id="screen-today">
+      <h1 class="date"><span id="dateStr"></span><span class="dplus" id="dplus"></span></h1>
+
+      <div class="chips">
+        <div class="chip">연속 생존<b id="streak">0일</b></div>
+        <div class="chip">이달 정상<b id="fullRate">—</b></div>
+      </div>
+
+      <div class="banner" id="banner">
+        <b>어제 미달.</b> 오늘은 거를 수 없는 날 — 최소 포지션(<span id="bannerMins">30·30·5</span>, 송은 룰 포함)은 무조건 채운다.
+      </div>
+
+      <div class="cards" id="cards"></div>
+
+      <div class="strip-section">
+        <div class="strip-head">
+          <span class="strip-title">최근 14일</span>
+          <span class="legend">
+            <span><i style="background:var(--red)"></i>정상</span>
+            <span><i style="background:var(--brass)"></i>최소</span>
+            <span><i style="background:var(--blue)"></i>미달</span>
+          </span>
+        </div>
+        <div class="strip" id="strip"></div>
+      </div>
+
+      <div class="rule-note">
+        <b>정상 포지션</b> <span id="goalFullNums">100 · 100 · 20</span> &nbsp;/&nbsp; <b>최소 포지션</b> <span id="goalMinNums">30 · 30 · 5</span><br>
+        <b>송은 룰</b> 짜증이 올라오면 — 해결 먼저, 감정은 나중. X는 그 자체로 그날 미달이다.<br>
+        룰은 하나. <b>두 번 연속 거르지 않는다.</b> 흩뿌려도 된다 — 20×5도 100이다.
+      </div>
+    </div>
+
+    <!-- ================= 추이 ================= -->
+    <div id="screen-trends" style="display:none">
+      <div class="chips">
+        <div class="chip">현재 스트릭<b id="curStreak">0일</b></div>
+        <div class="chip">최장 스트릭<b id="maxStreak">0일</b></div>
+      </div>
+
+      <div class="cal-section">
+        <div class="strip-head">
+          <span class="strip-title">캘린더</span>
+          <span class="legend">
+            <span><i style="background:var(--red)"></i>정상</span>
+            <span><i style="background:var(--brass)"></i>최소</span>
+            <span><i style="background:var(--blue)"></i>미달</span>
+          </span>
+        </div>
+        <div class="cal-card">
+          <div class="cal-head">
+            <button class="btn cal-nav" id="calPrev" aria-label="이전 달">◀&#xFE0E;</button>
+            <span class="cal-label mono" id="calLabel"></span>
+            <button class="btn cal-nav" id="calNext" aria-label="다음 달">▶&#xFE0E;</button>
+          </div>
+          <div class="cal-wd" id="calWd"></div>
+          <div class="cal-grid" id="calGrid"></div>
+        </div>
+      </div>
+
+      <div class="habit-section">
+        <div class="strip-head"><span class="strip-title" id="habitTitle">습관별</span></div>
+        <div class="ledger-wrap">
+          <table class="ledger compact">
+            <thead><tr><th>습관</th><th>정상</th><th>최소</th><th>미달</th><th>누적</th><th>정상률</th></tr></thead>
+            <tbody id="habitBody"></tbody>
+          </table>
+        </div>
+        <div class="wife-line" id="wifeLine"></div>
+        <div class="table-note">
+          습관별 정상 = 그 습관 목표만 충족한 날 / 장부·캘린더 정상 = 세 습관 모두 + 송은 X 없음.
+          두 기준이 다르므로 회고 인용 시 구분할 것.
+        </div>
+      </div>
+
+      <div class="month-section" id="monthSection" style="display:none">
+        <div class="strip-head"><span class="strip-title">월별 장부</span></div>
+        <div class="ledger-wrap">
+          <table class="ledger">
+            <thead><tr><th>월</th><th>정상</th><th>최소</th><th>미달</th><th>정상률</th></tr></thead>
+            <tbody id="monthBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 설정 ================= -->
+    <div id="screen-settings" style="display:none">
+      <div class="settings-section">
+        <div class="strip-head">
+          <span class="strip-title">목표치</span>
+          <button class="reset" id="goalRestoreBtn">기본값 복원</button>
+        </div>
+        <div class="goal-card" id="goalRows"></div>
+        <div class="settings-note">
+          목표를 바꾸면 <b>과거 기록의 판정도 새 기준으로 재평가</b>된다 — 목표 이력은 관리하지 않는다.
+          스트릭·정상률·장부가 모두 다시 계산된다.
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="strip-head"><span class="strip-title">백업</span></div>
+        <div class="settings-btns">
+          <button class="btn" id="exportFileBtn">백업 파일로 내보내기</button>
+          <button class="btn" id="exportBtn">클립보드로 복사</button>
+          <button class="btn" id="importFileBtn">파일에서 가져오기</button>
+          <button class="btn" id="importBtn">붙여넣어 가져오기</button>
+        </div>
+        <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+      </div>
+
+      <div class="settings-section">
+        <div class="strip-head"><span class="strip-title">데이터</span></div>
+        <div class="settings-btns">
+          <button class="btn danger" id="resetBtn">기록 초기화</button>
+        </div>
+        <div class="settings-info" id="settingsInfo"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<nav class="tabbar" id="tabbar" style="display:none">
+  <button class="tab active" data-tab="today">오늘</button>
+  <button class="tab" data-tab="trends">추이</button>
+  <button class="tab" data-tab="settings">설정</button>
+</nav>
+
+</body>
+</html>
