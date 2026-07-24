@@ -1,7 +1,7 @@
 /* 오늘 화면 렌더 — v1의 render/renderCards/renderStrip 1:1 이식 (월별 장부는 추이 화면으로 이동).
    h(핸들러): { addVal, undoVal, setDirect, toggleW, undoStack } — 값 변경은 전부 main.js가 소유. */
 import {
-  HABITS, WIFE, shift, daysBetween, weekday,
+  WIFE, goalsOf, shift, daysBetween, weekday,
   getDay, statusOf, completion, streak, monthFullRate
 } from '../logic.js';
 
@@ -18,6 +18,12 @@ export function renderToday(state, t, h) {
   var show = (y >= state.startDate) && statusOf(state, y) === 'miss';
   document.getElementById('banner').className = 'banner' + (show ? ' show' : '');
 
+  /* 배너·룰 노트의 목표 숫자는 설정을 따라간다 */
+  var goals = goalsOf(state);
+  document.getElementById('bannerMins').textContent = goals.map(function (g) { return g.min; }).join('·');
+  document.getElementById('goalFullNums').textContent = goals.map(function (g) { return g.target; }).join(' · ');
+  document.getElementById('goalMinNums').textContent = goals.map(function (g) { return g.min; }).join(' · ');
+
   renderCards(state, t, h);
   renderStrip(state, t);
 }
@@ -26,7 +32,7 @@ function renderCards(state, t, h) {
   var d = getDay(state, t), wrap = document.getElementById('cards');
   wrap.innerHTML = '';
 
-  HABITS.forEach(function (hb) {
+  goalsOf(state).forEach(function (hb) {
     var v = d[hb.key] || 0;
     var tier = v >= hb.target ? 'full' : (v >= hb.min ? 'min' : '');
     var card = document.createElement('div'); card.className = 'card';

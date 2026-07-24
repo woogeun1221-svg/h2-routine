@@ -244,6 +244,35 @@ td.empty { text-align: center !important; color: var(--faint); font-family: 'IBM
 
 /* ---------- settings ---------- */
 .settings-section { margin-top: 18px; }
+.settings-section + .settings-section { margin-top: 26px; }
+.goal-card {
+  margin-top: 12px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; padding: 4px 15px;
+}
+.goal-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+}
+.goal-row:last-child { border-bottom: none; }
+.goal-name { flex: 1; font-size: 13px; font-weight: 600; }
+.goal-unit { font-size: 11px; color: var(--faint); margin-left: 4px; font-weight: 400; }
+.goal-field { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
+.goal-input {
+  width: 68px; min-height: 42px; text-align: right; padding: 0 10px;
+  background: var(--surface2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 8px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 600;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.goal-input::-webkit-outer-spin-button, .goal-input::-webkit-inner-spin-button {
+  -webkit-appearance: none; margin: 0;
+}
+.goal-input:focus-visible { outline: 2px solid var(--blue); }
+.settings-note {
+  margin-top: 10px; padding: 0 3px;
+  font-size: 11px; line-height: 1.7; color: var(--faint);
+}
+.settings-note b { color: var(--muted); font-weight: 600; }
 .settings-btns { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 .settings-btns .btn {
   flex: none; font-family: 'IBM Plex Sans KR', sans-serif; font-size: 13px;

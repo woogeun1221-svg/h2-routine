@@ -31,7 +31,7 @@
       </div>
 
       <div class="banner" id="banner">
-        <b>어제 미달.</b> 오늘은 거를 수 없는 날 — 최소 포지션(30·30·5, 송은 룰 포함)은 무조건 채운다.
+        <b>어제 미달.</b> 오늘은 거를 수 없는 날 — 최소 포지션(<span id="bannerMins">30·30·5</span>, 송은 룰 포함)은 무조건 채운다.
       </div>
 
       <div class="cards" id="cards"></div>
@@ -49,7 +49,7 @@
       </div>
 
       <div class="rule-note">
-        <b>정상 포지션</b> 100 · 100 · 20 &nbsp;/&nbsp; <b>최소 포지션</b> 30 · 30 · 5<br>
+        <b>정상 포지션</b> <span id="goalFullNums">100 · 100 · 20</span> &nbsp;/&nbsp; <b>최소 포지션</b> <span id="goalMinNums">30 · 30 · 5</span><br>
         <b>송은 룰</b> 짜증이 올라오면 — 해결 먼저, 감정은 나중. X는 그 자체로 그날 미달이다.<br>
         룰은 하나. <b>두 번 연속 거르지 않는다.</b> 흩뿌려도 된다 — 20×5도 100이다.
       </div>
@@ -111,10 +111,31 @@
     <!-- ================= 설정 ================= -->
     <div id="screen-settings" style="display:none">
       <div class="settings-section">
+        <div class="strip-head">
+          <span class="strip-title">목표치</span>
+          <button class="reset" id="goalRestoreBtn">기본값 복원</button>
+        </div>
+        <div class="goal-card" id="goalRows"></div>
+        <div class="settings-note">
+          목표를 바꾸면 <b>과거 기록의 판정도 새 기준으로 재평가</b>된다 — 목표 이력은 관리하지 않는다.
+          스트릭·정상률·장부가 모두 다시 계산된다.
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="strip-head"><span class="strip-title">백업</span></div>
+        <div class="settings-btns">
+          <button class="btn" id="exportFileBtn">백업 파일로 내보내기</button>
+          <button class="btn" id="exportBtn">클립보드로 복사</button>
+          <button class="btn" id="importFileBtn">파일에서 가져오기</button>
+          <button class="btn" id="importBtn">붙여넣어 가져오기</button>
+        </div>
+        <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+      </div>
+
+      <div class="settings-section">
         <div class="strip-head"><span class="strip-title">데이터</span></div>
         <div class="settings-btns">
-          <button class="btn" id="importBtn">가져오기 (JSON 붙여넣기)</button>
-          <button class="btn" id="exportBtn">데이터 내보내기 (클립보드)</button>
           <button class="btn danger" id="resetBtn">기록 초기화</button>
         </div>
         <div class="settings-info" id="settingsInfo"></div>

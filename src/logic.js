@@ -9,6 +9,18 @@ export const HABITS = [
 
 export const WIFE = { key: 'w', name: '송은', sub: '해결 먼저, 감정 나중' };
 
+/* 유효 목표치 — state.settings의 오버라이드를 HABITS 기본값 위에 적용.
+   settings가 없거나 값이 이상하면 기본값 (v1 데이터 호환). */
+export function goalsOf(state) {
+  return HABITS.map(function (h) {
+    var o = (state.settings && state.settings[h.key]) || {};
+    var target = (typeof o.target === 'number' && o.target >= 1) ? o.target : h.target;
+    var min = (typeof o.min === 'number' && o.min >= 1) ? o.min : h.min;
+    if (min > target) min = target; // 어떤 조합이 와도 최소 ≤ 정상 보장
+    return { key: h.key, name: h.name, unit: h.unit, steps: h.steps, target: target, min: min };
+  });
+}
+
 /* ---------- date helpers ---------- */
 export function dstr(d) {
   var y = d.getFullYear(), m = ('0' + (d.getMonth() + 1)).slice(-2), dd = ('0' + d.getDate()).slice(-2);
@@ -30,9 +42,9 @@ export function weekday(ds) { var p = ds.split('-'); return WD[new Date(+p[0], +
 export function getDay(state, ds) { return state.days[ds] || { p: 0, s: 0, r: 0, w: null }; }
 
 export function statusOf(state, ds) {
-  var d = getDay(state, ds), full = true, min = true;
-  for (var i = 0; i < HABITS.length; i++) {
-    var h = HABITS[i], v = d[h.key] || 0;
+  var d = getDay(state, ds), goals = goalsOf(state), full = true, min = true;
+  for (var i = 0; i < goals.length; i++) {
+    var h = goals[i], v = d[h.key] || 0;
     if (v < h.target) full = false;
     if (v < h.min) min = false;
   }
@@ -41,11 +53,11 @@ export function statusOf(state, ds) {
 }
 
 export function completion(state, ds) {
-  var d = getDay(state, ds), sum = 0;
-  for (var i = 0; i < HABITS.length; i++) {
-    var h = HABITS[i]; sum += Math.min(1, (d[h.key] || 0) / h.target);
+  var d = getDay(state, ds), goals = goalsOf(state), sum = 0;
+  for (var i = 0; i < goals.length; i++) {
+    var h = goals[i]; sum += Math.min(1, (d[h.key] || 0) / h.target);
   }
-  return sum / HABITS.length;
+  return sum / goals.length;
 }
 
 /* 스트릭 = 최소 이상 연속일. 오늘이 미달(미기록 포함)이면 어제부터 센다 — 오늘은 진행중. */
@@ -139,15 +151,16 @@ export function habitMonthStats(state, ym, today) {
   var monthEnd = ym + '-' + ('0' + daysInMonth(ym)).slice(-2);
   var yest = shift(today, -1);
   var to = monthEnd < yest ? monthEnd : yest;
-  var habits = HABITS.map(function (h) {
+  var goals = goalsOf(state);
+  var habits = goals.map(function (h) {
     return { key: h.key, name: h.name, unit: h.unit, full: 0, min: 0, miss: 0, sum: 0 };
   });
   var w = { o: 0, x: 0, na: 0 }, total = 0, cur = from;
   while (cur <= to) {
     total++;
     var d = getDay(state, cur);
-    for (var i = 0; i < HABITS.length; i++) {
-      var h = HABITS[i], hs = habits[i], v = d[h.key] || 0;
+    for (var i = 0; i < goals.length; i++) {
+      var h = goals[i], hs = habits[i], v = d[h.key] || 0;
       hs.sum += v;
       if (v >= h.target) hs.full++;
       else if (v >= h.min) hs.min++;

@@ -75,6 +75,17 @@ function toggleW(v) {
   ensureDay(t).w = (curW === v) ? null : v;
   save(); render();
 }
+function setGoal(key, target, min) {
+  if (!state.settings) state.settings = {};
+  state.settings[key] = { target: target, min: min };
+  save(); render();
+}
+function resetGoals() {
+  if (!state.settings) return;
+  if (!confirm('목표치를 기본값(100·100·20 / 30·30·5)으로 되돌릴까?')) return;
+  delete state.settings;
+  save(); render();
+}
 
 /* ---------- tabs ---------- */
 var SCREENS = { today: 'screen-today', trends: 'screen-trends', settings: 'screen-settings' };
@@ -103,7 +114,7 @@ function render() {
     if (!trendYm) trendYm = t.slice(0, 7);
     renderTrends(state, t, trendYm);
   } else {
-    renderSettings(state);
+    renderSettings(state, { setGoal: setGoal });
   }
 }
 
@@ -130,9 +141,30 @@ document.getElementById('exportBtn').addEventListener('click', function () {
   } else fallback();
 });
 
-document.getElementById('importBtn').addEventListener('click', function () {
-  var text = prompt('v1 [데이터 내보내기]로 복사한 JSON을 붙여넣어줘.');
-  if (text === null || text.trim() === '') return;
+/* 파일 내보내기 — iOS에선 공유 시트(파일 앱·에어드랍)가 가장 확실, 그 외엔 다운로드 */
+document.getElementById('exportFileBtn').addEventListener('click', function () {
+  var json = exportText(state);
+  var name = 'h2-routine-' + todayStr() + '.json';
+  var file;
+  try { file = new File([json], name, { type: 'application/json' }); } catch (e) { file = null; }
+  if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+    navigator.share({ files: [file] }).catch(function (e) {
+      if (e && e.name === 'AbortError') return; // 사용자가 시트를 닫음
+      downloadFallback();
+    });
+    return;
+  }
+  downloadFallback();
+  function downloadFallback() {
+    var url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    var a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  }
+});
+
+function applyImport(text) {
   var incoming;
   try {
     incoming = importText(text.trim());
@@ -141,12 +173,29 @@ document.getElementById('importBtn').addEventListener('click', function () {
     return;
   }
   var existing = Object.keys(state.days).length;
-  if (existing > 0 && !confirm('현재 기록 ' + existing + '일치를 붙여넣은 데이터로 교체할까?')) return;
+  if (existing > 0 && !confirm('현재 기록 ' + existing + '일치를 가져온 데이터로 교체할까?')) return;
   state = incoming;
   undoStack = { p: [], s: [], r: [] };
   save(); render();
   alert('가져오기 완료 — ' + Object.keys(state.days).length + '일치 기록, 시작일 ' + state.startDate);
+}
+
+document.getElementById('importBtn').addEventListener('click', function () {
+  var text = prompt('백업 JSON을 붙여넣어줘 (v1 내보내기 포함).');
+  if (text === null || text.trim() === '') return;
+  applyImport(text);
 });
+
+var importFile = document.getElementById('importFile');
+document.getElementById('importFileBtn').addEventListener('click', function () { importFile.click(); });
+importFile.addEventListener('change', function () {
+  var f = importFile.files && importFile.files[0];
+  importFile.value = '';
+  if (!f) return;
+  f.text().then(applyImport, function () { alert('파일을 읽지 못했어.'); });
+});
+
+document.getElementById('goalRestoreBtn').addEventListener('click', resetGoals);
 
 document.getElementById('resetBtn').addEventListener('click', function () {
   if (!confirm('모든 기록을 삭제할까? 되돌릴 수 없어.')) return;

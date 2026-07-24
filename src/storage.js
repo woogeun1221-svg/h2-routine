@@ -28,6 +28,26 @@ export function validateState(obj) {
     }
     if (d.w !== undefined && d.w !== null && d.w !== 'o' && d.w !== 'x') return k + '.w 값 오류';
   }
+  if (obj.settings !== undefined) {
+    var e = validateSettings(obj.settings);
+    if (e) return e;
+  }
+  return null;
+}
+
+/* settings: { p?: {target, min}, s?: {...}, r?: {...} } — 있으면 둘 다 양의 정수, 최소 ≤ 정상 */
+function validateSettings(s) {
+  if (!s || typeof s !== 'object' || Array.isArray(s)) return 'settings 형식 오류';
+  var keys = Object.keys(s);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (k !== 'p' && k !== 's' && k !== 'r') return 'settings 키 오류: ' + k;
+    var g = s[k];
+    if (!g || typeof g !== 'object' || Array.isArray(g)) return 'settings.' + k + ' 형식 오류';
+    if (typeof g.target !== 'number' || !isFinite(g.target) || g.target < 1) return 'settings.' + k + '.target 값 오류';
+    if (typeof g.min !== 'number' || !isFinite(g.min) || g.min < 1) return 'settings.' + k + '.min 값 오류';
+    if (g.min > g.target) return 'settings.' + k + ' 최소가 정상보다 큼';
+  }
   return null;
 }
 

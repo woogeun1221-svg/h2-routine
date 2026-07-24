@@ -8,7 +8,8 @@ function mountSkeleton() {
     <span id="saveState"></span>
     <span id="dateStr"></span><span id="dplus"></span>
     <b id="streak"></b><b id="fullRate"></b>
-    <div class="banner" id="banner"></div>
+    <div class="banner" id="banner"><span id="bannerMins"></span></div>
+    <span id="goalFullNums"></span><span id="goalMinNums"></span>
     <div id="cards"></div>
     <div id="strip"></div>
     <div id="monthSection" style="display:none">
