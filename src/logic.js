@@ -1,5 +1,5 @@
-/* v1(h2-routine-tracker.html)의 상태 로직 1:1 이식.
-   모든 함수가 (state, today)를 인자로 받는 순수 함수 — 동작은 v1과 동일. */
+/* v1(h2-routine-tracker.html)의 일간 상태 로직을 유지하고 주간 검토를 확장.
+   모든 함수가 (state, today)를 인자로 받는 순수 함수. */
 
 export const HABITS = [
   { key: 'p', name: '푸쉬업', unit: '회', target: 100, min: 30, steps: [10, 25, 50] },
@@ -8,6 +8,9 @@ export const HABITS = [
 ];
 
 export const WIFE = { key: 'w', name: '송은', sub: '해결 먼저, 감정 나중' };
+export const INVESTMENT_REVIEW = {
+  key: 'i', name: '투자 원칙 정독·검토', sub: '매주 1회 · 목·금 권장'
+};
 
 /* 유효 목표치 — state.settings의 오버라이드를 HABITS 기본값 위에 적용.
    settings가 없거나 값이 이상하면 기본값 (v1 데이터 호환). */
@@ -38,8 +41,46 @@ export function daysBetween(a, b) {
 var WD = ['일', '월', '화', '수', '목', '금', '토'];
 export function weekday(ds) { var p = ds.split('-'); return WD[new Date(+p[0], +p[1] - 1, +p[2]).getDay()]; }
 
+/* 투자 원칙 검토 주간은 월요일 시작, 어느 날이든 한 번 완료할 수 있다.
+   금요일까지의 완료 여부로 금요일 일간 판정을 정하고, 목·금은 권장일이다.
+   startDate는 기능 활성일이라 기존 기록을 소급해 미달로 바꾸지 않는다. */
+export function investmentReviewWindow(ds) {
+  var p = ds.split('-');
+  var day = new Date(+p[0], +p[1] - 1, +p[2]).getDay();
+  var monday = shift(ds, -((day + 6) % 7));
+  return {
+    monday: monday,
+    thursday: shift(monday, 3),
+    friday: shift(monday, 4),
+    sunday: shift(monday, 6)
+  };
+}
+
+export function investmentReviewStatus(state, ds) {
+  var win = investmentReviewWindow(ds);
+  var start = state.investmentReviewStart;
+  if (typeof start !== 'string' || ds < start) {
+    return { active: false, done: false, phase: 'inactive', reviewedOn: null, ...win };
+  }
+
+  var reviewedOn = null, cur = win.monday > start ? win.monday : start;
+  var to = ds < win.sunday ? ds : win.sunday;
+  while (cur <= to) {
+    if (getDay(state, cur).i === true) { reviewedOn = cur; break; }
+    cur = shift(cur, 1);
+  }
+
+  var phase;
+  if (reviewedOn) phase = 'done';
+  else if (ds < win.thursday) phase = 'upcoming';
+  else if (ds === win.thursday) phase = 'open';
+  else if (ds === win.friday) phase = 'deadline';
+  else phase = 'missed';
+  return { active: true, done: !!reviewedOn, phase: phase, reviewedOn: reviewedOn, ...win };
+}
+
 /* ---------- status logic ---------- */
-export function getDay(state, ds) { return state.days[ds] || { p: 0, s: 0, r: 0, w: null }; }
+export function getDay(state, ds) { return state.days[ds] || { p: 0, s: 0, r: 0, w: null, i: false }; }
 
 export function statusOf(state, ds) {
   var d = getDay(state, ds), goals = goalsOf(state), full = true, min = true;
@@ -49,6 +90,10 @@ export function statusOf(state, ds) {
     if (v < h.min) min = false;
   }
   if (d.w === 'x') { full = false; min = false; }  // X = 그날 전체 미달
+  var review = investmentReviewStatus(state, ds);
+  if (review.active && ds === review.friday && !review.done) {
+    full = false; min = false; // 금요일까지 거르면 그날 전체 미달
+  }
   return full ? 'full' : (min ? 'min' : 'miss');
 }
 
@@ -57,7 +102,13 @@ export function completion(state, ds) {
   for (var i = 0; i < goals.length; i++) {
     var h = goals[i]; sum += Math.min(1, (d[h.key] || 0) / h.target);
   }
-  return sum / goals.length;
+  var count = goals.length;
+  var review = investmentReviewStatus(state, ds);
+  if (review.active && ds === review.friday) {
+    sum += review.done ? 1 : 0;
+    count++;
+  }
+  return sum / count;
 }
 
 /* 스트릭 = 최소 이상 연속일. 오늘이 미달(미기록 포함)이면 어제부터 센다 — 오늘은 진행중. */
@@ -134,7 +185,7 @@ export function calMonth(state, ym, today) {
     if (ds < state.startDate) kind = 'out';
     else if (ds > today) kind = 'future';
     else if (ds === today) {
-      var recorded = completion(state, ds) > 0 || getDay(state, ds).w;
+      var recorded = completion(state, ds) > 0 || getDay(state, ds).w || getDay(state, ds).i;
       kind = recorded ? statusOf(state, ds) : 'pending';
     } else kind = statusOf(state, ds);
     cells.push({ ds: ds, day: d, kind: kind });
@@ -142,9 +193,54 @@ export function calMonth(state, ym, today) {
   return { lead: lead, cells: cells };
 }
 
+/* 투자 원칙 월간 통계 — 주간 마감일인 금요일이 속한 달에 귀속한다.
+   금요일까지 완료=정상, 토·일 완료=최소, 일요일까지 미완료=미달.
+   완료했거나 일요일이 지난 주만 확정 표본으로 센다. */
+function investmentReviewMonthStats(state, ym, today) {
+  var start = state.investmentReviewStart;
+  if (typeof start !== 'string') return null;
+
+  var result = {
+    key: INVESTMENT_REVIEW.key, name: '투자 원칙(주)', unit: '회',
+    full: 0, min: 0, miss: 0, sum: 0, total: 0, fullRate: null, minRate: null
+  };
+  var monthStart = ym + '-01';
+  var monthEnd = ym + '-' + ('0' + daysInMonth(ym)).slice(-2);
+  var yest = shift(today, -1);
+  var friday = investmentReviewWindow(monthStart).friday;
+  if (friday < monthStart) friday = shift(friday, 7);
+
+  while (friday <= monthEnd) {
+    var win = investmentReviewWindow(friday);
+    if (win.sunday >= start) {
+      var from = win.monday > start ? win.monday : start;
+      var to = yest < win.sunday ? yest : win.sunday;
+      var reviewedOn = null, cur = from;
+      while (cur <= to) {
+        if (getDay(state, cur).i === true) { reviewedOn = cur; break; }
+        cur = shift(cur, 1);
+      }
+      if (reviewedOn) {
+        if (reviewedOn <= win.friday) result.full++;
+        else result.min++;
+        result.sum++; result.total++;
+      } else if (win.sunday <= yest) {
+        result.miss++; result.total++;
+      }
+    }
+    friday = shift(friday, 7);
+  }
+
+  if (result.total) {
+    result.fullRate = Math.round(result.full / result.total * 100);
+    result.minRate = Math.round((result.full + result.min) / result.total * 100);
+  }
+  return result;
+}
+
 /* 습관별 월간 통계 — 해당 월 안에서 startDate부터 어제까지(확정분만).
-   습관별로 자기 목표 기준 정상/최소/미달 일수, 누적 합, 달성률.
-   송은은 o/x/na 일수. total=0이면 표본 없음. */
+   일간 습관은 자기 목표 기준 정상/최소/미달 일수, 누적 합, 달성률.
+   투자 원칙은 위 주간 기준, 송은은 o/x/na 일수. total=0이면 일간 표본 없음. */
 export function habitMonthStats(state, ym, today) {
   var monthStart = ym + '-01';
   var from = monthStart > state.startDate ? monthStart : state.startDate;
@@ -173,7 +269,7 @@ export function habitMonthStats(state, ym, today) {
     habits[j].fullRate = total ? Math.round(habits[j].full / total * 100) : null;
     habits[j].minRate = total ? Math.round((habits[j].full + habits[j].min) / total * 100) : null;
   }
-  return { total: total, habits: habits, w: w };
+  return { total: total, habits: habits, investment: investmentReviewMonthStats(state, ym, today), w: w };
 }
 
 /* 월별 장부 — startDate부터 어제까지, 최신 월부터. */

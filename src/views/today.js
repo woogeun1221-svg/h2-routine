@@ -1,8 +1,8 @@
-/* 오늘 화면 렌더 — v1의 render/renderCards/renderStrip 1:1 이식 (월별 장부는 추이 화면으로 이동).
-   h(핸들러): { addVal, undoVal, setDirect, toggleW, undoStack } — 값 변경은 전부 main.js가 소유. */
+/* 오늘 화면 렌더 — 일간 카드와 주간 투자 원칙 검토.
+   h(핸들러): { addVal, undoVal, setDirect, toggleW, toggleInvestmentReview, undoStack }. */
 import {
-  WIFE, goalsOf, shift, daysBetween, weekday,
-  getDay, statusOf, completion, streak, monthFullRate
+  WIFE, INVESTMENT_REVIEW, goalsOf, shift, daysBetween, weekday,
+  getDay, statusOf, completion, streak, monthFullRate, investmentReviewStatus
 } from '../logic.js';
 
 export function renderToday(state, t, h) {
@@ -102,6 +102,60 @@ function renderCards(state, t, h) {
   });
   wc.appendChild(wtop); wc.appendChild(seg);
   wrap.appendChild(wc);
+
+  renderInvestmentReviewCard(state, t, h, wrap);
+}
+
+function renderInvestmentReviewCard(state, t, h, wrap) {
+  var review = investmentReviewStatus(state, t);
+  var card = document.createElement('div');
+  card.className = 'card weekly-card review-' + review.phase;
+
+  var top = document.createElement('div'); top.className = 'card-top';
+  var nm = document.createElement('div'); nm.className = 'card-name';
+  nm.textContent = INVESTMENT_REVIEW.name;
+  var sub = document.createElement('span'); sub.className = 'card-sub';
+  sub.textContent = INVESTMENT_REVIEW.sub;
+  nm.appendChild(sub);
+
+  if (review.done || review.phase === 'deadline' || review.phase === 'missed') {
+    var flag = document.createElement('span');
+    flag.className = 'done-flag ' + (review.done ? 'full' : (review.phase === 'deadline' ? 'min' : 'miss'));
+    flag.textContent = review.done ? '주간 완료' : (review.phase === 'deadline' ? '오늘 마감' : '주간 미달');
+    nm.appendChild(flag);
+  }
+  top.appendChild(nm);
+
+  var status = document.createElement('div'); status.className = 'weekly-status';
+  if (review.done) {
+    status.textContent = review.reviewedOn.slice(5).replace('-', '.') + ' ' + weekday(review.reviewedOn) +
+      '요일 완료' + (review.reviewedOn > review.friday ? ' · 마감 후' : '');
+  } else if (review.phase === 'upcoming') {
+    status.textContent = '목·금 권장 · 지금 미리 완료할 수 있음';
+  } else if (review.phase === 'open') {
+    status.textContent = '권장일 — 오늘 또는 내일';
+  } else if (review.phase === 'deadline') {
+    status.textContent = '권장 마감일 — 아직 미완료';
+  } else if (review.phase === 'missed') {
+    status.textContent = '권장일 지남 — 늦게라도 완료 가능';
+  } else {
+    status.textContent = '업데이트 이후 주간 기록 시작';
+  }
+  card.appendChild(top); card.appendChild(status);
+
+  var btns = document.createElement('div'); btns.className = 'btns';
+  var b = document.createElement('button'); b.className = 'btn weekly-btn';
+  if (review.active) {
+    b.textContent = review.done ? '이번 주 완료 취소' :
+      (review.phase === 'missed' ? '늦게라도 완료' : '정독·검토 완료');
+    b.setAttribute('aria-pressed', review.done ? 'true' : 'false');
+    if (review.done) b.className += ' sel-o';
+    b.addEventListener('click', h.toggleInvestmentReview);
+  } else {
+    b.textContent = '기록 시작 전';
+    b.disabled = true;
+  }
+  btns.appendChild(b); card.appendChild(btns); wrap.appendChild(card);
 }
 
 function renderStrip(state, t) {

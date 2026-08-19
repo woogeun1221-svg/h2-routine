@@ -127,4 +127,9 @@ describe('가져오기 검증 (v1 내보내기 JSON 호환)', () => {
   it('음수 값 거부', () => {
     expect(validateState({ startDate: '2026-06-29', days: { '2026-06-29': { p: -1, s: 0, r: 0, w: null } } })).not.toBe(null);
   });
+  it('투자 원칙 필드는 날짜와 boolean만 허용', () => {
+    expect(validateState({ startDate: '2026-06-29', investmentReviewStart: '2026-08-19', days: { '2026-08-20': { i: true } } })).toBe(null);
+    expect(validateState({ startDate: '2026-06-29', investmentReviewStart: '2026/08/19', days: {} })).not.toBe(null);
+    expect(validateState({ startDate: '2026-06-29', days: { '2026-08-20': { i: 'yes' } } })).not.toBe(null);
+  });
 });

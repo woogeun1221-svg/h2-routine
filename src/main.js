@@ -7,7 +7,7 @@ import '@fontsource/ibm-plex-mono/600.css';
 import '@fontsource/ibm-plex-mono/700.css';
 import './styles.css';
 import { registerSW } from 'virtual:pwa-register';
-import { todayStr, getDay, monthList, shiftMonth } from './logic.js';
+import { todayStr, getDay, shift, monthList, shiftMonth, investmentReviewStatus } from './logic.js';
 import { load, save as persist, exportText, importText, freshState } from './storage.js';
 import { renderToday } from './views/today.js';
 import { renderTrends } from './views/trends.js';
@@ -75,6 +75,19 @@ function toggleW(v) {
   ensureDay(t).w = (curW === v) ? null : v;
   save(); render();
 }
+function toggleInvestmentReview() {
+  var t = todayStr();
+  var review = investmentReviewStatus(state, t);
+  if (!review.active) return;
+  if (review.done) {
+    var due = review.monday > state.investmentReviewStart ? review.monday : state.investmentReviewStart;
+    while (due <= t && due <= review.sunday) {
+      if (state.days[due]) delete state.days[due].i;
+      due = shift(due, 1);
+    }
+  } else ensureDay(t).i = true;
+  save(); render();
+}
 function setGoal(key, target, min) {
   if (!state.settings) state.settings = {};
   state.settings[key] = { target: target, min: min };
@@ -109,7 +122,10 @@ function render() {
   });
 
   if (activeTab === 'today') {
-    renderToday(state, t, { addVal: addVal, undoVal: undoVal, setDirect: setDirect, toggleW: toggleW, undoStack: undoStack });
+    renderToday(state, t, {
+      addVal: addVal, undoVal: undoVal, setDirect: setDirect, toggleW: toggleW,
+      toggleInvestmentReview: toggleInvestmentReview, undoStack: undoStack
+    });
   } else if (activeTab === 'trends') {
     if (!trendYm) trendYm = t.slice(0, 7);
     renderTrends(state, t, trendYm);
@@ -167,7 +183,7 @@ document.getElementById('exportFileBtn').addEventListener('click', function () {
 function applyImport(text) {
   var incoming;
   try {
-    incoming = importText(text.trim());
+    incoming = importText(text.trim(), todayStr());
   } catch (e) {
     alert('가져오기 실패 — ' + (e.message || 'JSON 형식을 확인해줘.'));
     return;

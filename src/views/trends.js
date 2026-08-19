@@ -60,14 +60,16 @@ function renderHabitStats(state, t, ym) {
     return;
   }
 
-  stats.habits.forEach(function (h) {
+  var rows = stats.habits.slice();
+  if (stats.investment) rows.push(stats.investment);
+  rows.forEach(function (h) {
     var tr = document.createElement('tr');
     tr.innerHTML = '<td>' + h.name + '</td>' +
       '<td class="c-full">' + h.full + '</td>' +
       '<td class="c-min">' + h.min + '</td>' +
       '<td class="c-miss">' + h.miss + '</td>' +
       '<td>' + h.sum.toLocaleString() + h.unit + '</td>' +
-      '<td class="c-rate">' + h.fullRate + '%</td>';
+      '<td class="c-rate">' + (h.fullRate === null ? '—' : h.fullRate + '%') + '</td>';
     tb.appendChild(tr);
   });
 

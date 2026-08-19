@@ -1,17 +1,27 @@
-/* localStorage 저장 + JSON 내보내기/가져오기. 스키마는 v1과 동일:
-   { startDate: 'YYYY-MM-DD', days: { 'YYYY-MM-DD': { p, s, r, w: 'o'|'x'|null } } } */
+/* localStorage 저장 + JSON 내보내기/가져오기. v1 스키마에 선택 필드만 추가:
+   { startDate, investmentReviewStart?, days: { date: { p, s, r, w, i? } } }
+   i=true는 그날 투자 원칙 주간 검토를 완료했다는 뜻이며 요일 제한은 없다. */
 
 var STORE_KEY = 'h2-routine-v1';
 var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function freshState(today) {
-  return { startDate: today, days: {} };
+  return { startDate: today, investmentReviewStart: today, days: {} };
+}
+
+function activateInvestmentReview(state, today) {
+  if (today && !state.investmentReviewStart) state.investmentReviewStart = today;
+  return state;
 }
 
 /* 유효하면 null, 아니면 오류 메시지 반환 */
 export function validateState(obj) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return '객체 형식이 아님';
   if (typeof obj.startDate !== 'string' || !DATE_RE.test(obj.startDate)) return 'startDate 형식 오류';
+  if (obj.investmentReviewStart !== undefined &&
+      (typeof obj.investmentReviewStart !== 'string' || !DATE_RE.test(obj.investmentReviewStart))) {
+    return 'investmentReviewStart 형식 오류';
+  }
   if (!obj.days || typeof obj.days !== 'object' || Array.isArray(obj.days)) return 'days 없음';
   var keys = Object.keys(obj.days);
   for (var i = 0; i < keys.length; i++) {
@@ -27,6 +37,7 @@ export function validateState(obj) {
       }
     }
     if (d.w !== undefined && d.w !== null && d.w !== 'o' && d.w !== 'x') return k + '.w 값 오류';
+    if (d.i !== undefined && typeof d.i !== 'boolean') return k + '.i 값 오류';
   }
   if (obj.settings !== undefined) {
     var e = validateSettings(obj.settings);
@@ -57,7 +68,7 @@ export function load(today) {
     raw = localStorage.getItem(STORE_KEY);
     var state = JSON.parse(raw);
     if (validateState(state)) throw new Error('invalid');
-    return state;
+    return activateInvestmentReview(state, today);
   } catch (e) {
     // 손상된 원본을 덮어쓰기 전에 보존 — 수개월치 기록의 마지막 복구 경로
     if (raw) { try { localStorage.setItem(STORE_KEY + '.bak', raw); } catch (e2) {} }
@@ -74,9 +85,9 @@ export function exportText(state) {
 }
 
 /* v1 [데이터 내보내기] JSON을 받아 검증된 state 반환. 문제 있으면 throw. */
-export function importText(text) {
+export function importText(text, today) {
   var obj = JSON.parse(text);
   var err = validateState(obj);
   if (err) throw new Error(err);
-  return obj;
+  return activateInvestmentReview(obj, today);
 }

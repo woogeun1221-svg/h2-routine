@@ -18,16 +18,19 @@ function mountSkeleton() {
 }
 
 const noop = () => {};
-const handlers = { addVal: noop, undoVal: noop, setDirect: noop, toggleW: noop, undoStack: { p: [], s: [], r: [] } };
+const handlers = {
+  addVal: noop, undoVal: noop, setDirect: noop, toggleW: noop,
+  toggleInvestmentReview: noop, undoStack: { p: [], s: [], r: [] }
+};
 const FULL = { p: 100, s: 100, r: 20, w: null };
 
 describe('renderToday DOM 스모크', () => {
   beforeEach(mountSkeleton);
 
-  it('카드 4개(습관 3 + 송은), 14일 스트립, 날짜/D+ 렌더', () => {
-    const state = { startDate: '2026-07-01', days: { '2026-07-21': FULL } };
+  it('카드 5개(일간 4 + 투자 원칙 주간 1), 14일 스트립, 날짜/D+ 렌더', () => {
+    const state = { startDate: '2026-07-01', investmentReviewStart: '2026-07-22', days: { '2026-07-21': FULL } };
     renderToday(state, '2026-07-22', handlers);
-    expect(document.querySelectorAll('#cards .card').length).toBe(4);
+    expect(document.querySelectorAll('#cards .card').length).toBe(5);
     expect(document.querySelectorAll('#strip .day').length).toBe(14);
     expect(document.getElementById('dateStr').textContent).toBe('2026.07.22 수');
     expect(document.getElementById('dplus').textContent).toBe('D+22');
@@ -49,5 +52,33 @@ describe('renderToday DOM 스모크', () => {
     renderToday(state, '2026-07-22', handlers);
     const todayCandle = document.querySelectorAll('#strip .candle')[13];
     expect(todayCandle.className).toContain('miss');
+  });
+
+  it('수요일에도 완료할 수 있고 금요일에 같은 주 완료 상태를 공유', () => {
+    var clicked = 0;
+    const h = { ...handlers, toggleInvestmentReview: () => { clicked++; } };
+    const wedState = { startDate: '2026-08-01', investmentReviewStart: '2026-08-19', days: {} };
+    renderToday(wedState, '2026-08-19', h);
+    const button = document.querySelector('.weekly-btn');
+    expect(button.textContent).toBe('정독·검토 완료');
+    expect(button.disabled).toBe(false);
+    button.click();
+    expect(clicked).toBe(1);
+
+    const doneState = {
+      startDate: '2026-08-01', investmentReviewStart: '2026-08-19',
+      days: { '2026-08-19': { ...FULL, i: true } }
+    };
+    renderToday(doneState, '2026-08-21', handlers);
+    expect(document.querySelector('.weekly-status').textContent).toContain('08.19 수요일 완료');
+    expect(document.querySelector('.weekly-btn').textContent).toBe('이번 주 완료 취소');
+  });
+
+  it('주말에도 늦은 완료 버튼을 활성화', () => {
+    const state = { startDate: '2026-08-01', investmentReviewStart: '2026-08-19', days: {} };
+    renderToday(state, '2026-08-22', handlers);
+    const button = document.querySelector('.weekly-btn');
+    expect(button.textContent).toBe('늦게라도 완료');
+    expect(button.disabled).toBe(false);
   });
 });

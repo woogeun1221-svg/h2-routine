@@ -122,6 +122,12 @@ h1.date .dplus { font-size: 13px; font-weight: 600; color: var(--faint); margin-
 .done-flag.full { color: var(--red); background: var(--red-dim); }
 .done-flag.min { color: var(--brass); background: var(--brass-dim); }
 .done-flag.miss { color: var(--blue); background: var(--blue-dim); }
+.weekly-card { position: relative; }
+.weekly-card.review-deadline { border-color: rgba(217,164,65,.55); }
+.weekly-card.review-missed { border-color: rgba(91,141,239,.55); }
+.weekly-status { margin-top: 11px; font-size: 12px; line-height: 1.55; color: var(--muted); }
+.weekly-btn { font-family: 'IBM Plex Sans KR', sans-serif; font-size: 13px; }
+.weekly-btn:disabled { color: var(--faint); opacity: .65; cursor: default; }
 
 /* ---------- 14-day strip ---------- */
 .strip-section { margin-top: 24px; }

@@ -72,4 +72,17 @@ describe('renderTrends DOM 스모크', () => {
     expect(document.querySelector('#habitBody td.empty')).not.toBe(null);
     expect(document.getElementById('wifeLine').textContent).toBe('');
   });
+
+  it('투자 원칙 주간 통계를 습관별 표의 네 번째 행으로 표시', () => {
+    const state = {
+      startDate: '2026-08-01', investmentReviewStart: '2026-08-03',
+      days: { '2026-08-05': { ...FULL, i: true } }
+    };
+    renderTrends(state, '2026-08-10', '2026-08');
+    const rows = document.querySelectorAll('#habitBody tr');
+    expect(rows.length).toBe(4);
+    expect(rows[3].textContent).toContain('투자 원칙(주)');
+    expect(rows[3].textContent).toContain('1회');
+    expect(rows[3].textContent).toContain('100%');
+  });
 });

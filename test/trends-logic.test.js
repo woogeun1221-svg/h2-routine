@@ -114,4 +114,44 @@ describe('habitMonthStats — 어제까지 확정분, 습관별 자기 목표 �
     expect(jun.total).toBe(2);
     expect(jun.habits[0]).toMatchObject({ full: 1, min: 1, fullRate: 50 });
   });
+
+  it('투자 원칙은 정상 주·주말 완료·미달 주를 주간 단위로 집계', () => {
+    const s = {
+      startDate: '2026-08-01', investmentReviewStart: '2026-08-03',
+      days: {
+        '2026-08-05': { ...FULL, i: true },
+        '2026-08-15': { ...FULL, i: true }
+      }
+    };
+    const stats = habitMonthStats(s, '2026-08', '2026-08-27');
+    expect(stats.investment).toMatchObject({
+      full: 1, min: 1, miss: 1, sum: 2, total: 3, fullRate: 33, minRate: 67
+    });
+  });
+
+  it('투자 원칙 진행 중 미완료 주는 제외하고, 완료된 주는 즉시 확정', () => {
+    const pending = {
+      startDate: '2026-08-01', investmentReviewStart: '2026-08-03', days: {}
+    };
+    expect(habitMonthStats(pending, '2026-08', '2026-08-27').investment.total).toBe(3);
+
+    const done = {
+      ...pending,
+      days: { '2026-08-26': { ...FULL, i: true } }
+    };
+    expect(habitMonthStats(done, '2026-08', '2026-08-27').investment).toMatchObject({
+      full: 1, miss: 3, total: 4
+    });
+  });
+
+  it('월 경계 주간은 금요일이 속한 달에 귀속', () => {
+    const s = {
+      startDate: '2026-07-01', investmentReviewStart: '2026-07-27',
+      days: { '2026-08-01': { ...FULL, i: true } }
+    };
+    expect(habitMonthStats(s, '2026-07', '2026-08-05').investment).toMatchObject({
+      full: 0, min: 1, miss: 0, total: 1
+    });
+    expect(habitMonthStats(s, '2026-08', '2026-08-05').investment.total).toBe(0);
+  });
 });
