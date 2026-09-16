@@ -29,6 +29,14 @@
   월간 O 비율, O/X 달력과 사유 열람, 여러 달 아카이브, 검색/기간 필터 유지,
   전체 사유 Markdown 및 기존 JSON 백업 다운로드, 기존 기록 보존 검증.
   외부 알림 API는 mock. 화면: `/private/tmp/h2-routine-qa/trends-390.png` 등.
-- `git diff --check` 통과. 배포 결과는 완료 후 갱신.
+- `git diff --check` 통과.
+
+## 배포 완료
+
+- 기능 소스 `99b353e`를 `origin/main`에 반영, `npm run deploy`로 `gh-pages` `e692c1e` 배포.
+- GitHub Pages run `35122465988` 완료·성공 확인.
+- `node scripts/browser_qa.cjs --live-smoke`: 공개 URL HTTP 200, 최상단 질문,
+  기본 만족도 달력·집계 및 X 사유 아카이브 표시 확인. 390px 가로 넘침/브라우저 오류 없음.
+- 공개 화면: `/private/tmp/h2-routine-qa/production-trends-390.png`.
 
 초기 O/X·알림 구현과 기존 운영 설정: [이전 인수인계](docs/agent-history/2026-09-17-reflection-reminder-initial.md).
