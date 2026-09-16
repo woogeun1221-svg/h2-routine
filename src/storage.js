@@ -1,6 +1,7 @@
 /* localStorage 저장 + JSON 내보내기/가져오기. v1 스키마에 선택 필드만 추가:
    { startDate, investmentReviewStart?, days: { date: { p, s, r, w, i? } } }
-   i=true는 그날 투자 원칙 주간 검토를 완료했다는 뜻이며 요일 제한은 없다. */
+   i=true는 그날 투자 원칙 주간 검토를 완료했다는 뜻이며 요일 제한은 없다.
+   self=o/x/null, selfReason은 하루 만족도 선택/이유이며 기존 루틴 판정과 별개다. */
 
 var STORE_KEY = 'h2-routine-v1';
 var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -38,6 +39,10 @@ export function validateState(obj) {
     }
     if (d.w !== undefined && d.w !== null && d.w !== 'o' && d.w !== 'x') return k + '.w 값 오류';
     if (d.i !== undefined && typeof d.i !== 'boolean') return k + '.i 값 오류';
+    if (d.self !== undefined && d.self !== null && d.self !== 'o' && d.self !== 'x') return k + '.self 값 오류';
+    if (d.selfReason !== undefined && (typeof d.selfReason !== 'string' || d.selfReason.length > 4000)) {
+      return k + '.selfReason 값 오류';
+    }
   }
   if (obj.settings !== undefined) {
     var e = validateSettings(obj.settings);

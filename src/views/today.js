@@ -4,8 +4,10 @@ import {
   WIFE, INVESTMENT_REVIEW, goalsOf, shift, daysBetween, weekday,
   getDay, statusOf, completion, streak, monthFullRate, investmentReviewStatus
 } from '../logic.js';
+import { renderReflection } from './reflection.js';
 
 export function renderToday(state, t, h) {
+  renderReflection(state, t, h);
   var p = t.split('-');
   document.getElementById('dateStr').textContent = p[0] + '.' + p[1] + '.' + p[2] + ' ' + weekday(t);
   document.getElementById('dplus').textContent = 'D+' + (daysBetween(state.startDate, t) + 1);

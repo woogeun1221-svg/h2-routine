@@ -12,6 +12,7 @@ import { load, save as persist, exportText, importText, freshState } from './sto
 import { renderToday } from './views/today.js';
 import { renderTrends } from './views/trends.js';
 import { renderSettings } from './views/settings.js';
+import { createReminderClient, reminderStatusText } from './reminders.js';
 
 /* 새 배포 감지: 로드 시 1회 + 앱 재개(resume)마다 체크 — iOS standalone은
    suspend→resume에서 리로드가 없어 이게 없으면 콜드 스타트까지 옛 버전에 머문다. */
@@ -26,6 +27,21 @@ var undoStack = { p: [], s: [], r: [] };
 var renderedDate = null;
 var activeTab = 'today';       // 'today' | 'trends' | 'settings'
 var trendYm = null;            // 추이 화면에서 보고 있는 달 — 진입 시 이번 달로 리셋
+var reminders = createReminderClient({ onStatus: renderReminderStatus });
+
+function renderReminderStatus() {
+  if (!reminders) return;
+  var answer = getDay(state, todayStr()).self;
+  var text = reminderStatusText(reminders.getStatus(), answer === 'o' || answer === 'x');
+  ['reminderStatus', 'reminderSettingsStatus'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = text;
+  });
+}
+function syncReflection() {
+  var t = todayStr(), answer = getDay(state, t).self;
+  return reminders.enqueue(t, answer === 'o' || answer === 'x');
+}
 
 /* ---------- save ----------
    v1은 원격 storage라 250ms 디바운스였지만, autoUpdate SW가 임의 시점에 페이지를
@@ -74,6 +90,15 @@ function toggleW(v) {
   var curW = getDay(state, t).w || null;
   ensureDay(t).w = (curW === v) ? null : v;
   save(); render();
+}
+function setReflection(day, answer) {
+  ensureDay(day).self = answer;
+  save(); render();
+  reminders.enqueue(day, answer === 'o' || answer === 'x');
+}
+function setReflectionReason(day, reason) {
+  ensureDay(day).selfReason = reason;
+  save(); // 입력 중 재렌더하지 않아 한글 조합과 커서를 보존한다.
 }
 function toggleInvestmentReview() {
   var t = todayStr();
@@ -124,6 +149,7 @@ function render() {
   if (activeTab === 'today') {
     renderToday(state, t, {
       addVal: addVal, undoVal: undoVal, setDirect: setDirect, toggleW: toggleW,
+      setReflection: setReflection, setReflectionReason: setReflectionReason,
       toggleInvestmentReview: toggleInvestmentReview, undoStack: undoStack
     });
   } else if (activeTab === 'trends') {
@@ -132,6 +158,7 @@ function render() {
   } else {
     renderSettings(state, { setGoal: setGoal });
   }
+  renderReminderStatus();
 }
 
 document.querySelectorAll('.tabbar .tab').forEach(function (b) {
@@ -193,6 +220,7 @@ function applyImport(text) {
   state = incoming;
   undoStack = { p: [], s: [], r: [] };
   save(); render();
+  syncReflection();
   alert('가져오기 완료 — ' + Object.keys(state.days).length + '일치 기록, 시작일 ' + state.startDate);
 }
 
@@ -219,6 +247,20 @@ document.getElementById('resetBtn').addEventListener('click', function () {
   undoStack = { p: [], s: [], r: [] };
   try { persist(state); } catch (e) {}
   render();
+  syncReflection();
+});
+
+document.getElementById('reminderConnectForm').addEventListener('submit', async function (event) {
+  event.preventDefault();
+  var input = document.getElementById('reminderConnectCode');
+  var button = event.currentTarget.querySelector('button');
+  button.disabled = true;
+  try {
+    await reminders.connect(input.value);
+    input.value = '';
+    await syncReflection();
+  } catch (error) { alert(error.message); }
+  finally { button.disabled = false; }
 });
 
 /* ---------- day rollover + resume 시 SW 갱신 체크 ---------- */
@@ -230,7 +272,18 @@ document.addEventListener('visibilitychange', function () {
     if (activeTab === 'trends') trendYm = todayStr().slice(0, 7);
     render();
   }
+  syncReflection();
 });
+window.addEventListener('online', syncReflection);
+setInterval(function () {
+  if (document.visibilityState !== 'visible') return;
+  if (renderedDate !== todayStr()) {
+    undoStack = { p: [], s: [], r: [] };
+    if (activeTab === 'trends') trendYm = todayStr().slice(0, 7);
+    render();
+  }
+  syncReflection();
+}, 60000);
 
 /* ---------- init ---------- */
 document.getElementById('loading').style.display = 'none';
@@ -238,3 +291,9 @@ document.getElementById('main').style.display = 'block';
 document.getElementById('tabbar').style.display = 'flex';
 render();
 save();
+var connectionCode = new URLSearchParams(location.hash.slice(1)).get('reminder');
+if (connectionCode) {
+  // 연결 코드는 히스토리·공유 URL에 남기지 않는다.
+  history.replaceState(null, '', location.pathname + location.search);
+  reminders.connect(connectionCode).then(syncReflection).catch(function (error) { alert(error.message); });
+} else syncReflection();

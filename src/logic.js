@@ -29,7 +29,14 @@ export function dstr(d) {
   var y = d.getFullYear(), m = ('0' + (d.getMonth() + 1)).slice(-2), dd = ('0' + d.getDate()).slice(-2);
   return y + '-' + m + '-' + dd;
 }
-export function todayStr() { return dstr(new Date()); }
+export function todayStr() {
+  // 밤 11시 알림과 날짜 경계가 같도록 한국 시간을 사용한다.
+  var parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  var values = Object.fromEntries(parts.map(function (p) { return [p.type, p.value]; }));
+  return values.year + '-' + values.month + '-' + values.day;
+}
 export function shift(ds, n) {
   var p = ds.split('-'); var d = new Date(+p[0], +p[1] - 1, +p[2]); d.setDate(d.getDate() + n); return dstr(d);
 }

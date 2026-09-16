@@ -3,10 +3,12 @@
 import {
   streak, longestStreak, monthList, calMonth, habitMonthStats, monthlyRows
 } from '../logic.js';
+import { renderReflectionHistory } from './reflection.js';
 
 var WD = ['일', '월', '화', '수', '목', '금', '토'];
 
 export function renderTrends(state, t, ym) {
+  renderReflectionHistory(state, ym);
   document.getElementById('curStreak').textContent = streak(state, t) + '일';
   document.getElementById('maxStreak').textContent = longestStreak(state, t) + '일';
 
