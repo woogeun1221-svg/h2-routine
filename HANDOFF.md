@@ -42,6 +42,17 @@
 ## 배포와 확인
 
 - 사용자가 사이트 배포·알림 가동·연결 메시지 발송을 승인함.
-- 배포와 서비스 등록 결과는 완료 후 아래에 기록.
+- 기능 소스 `693aaaa`를 `origin/main`에 반영하고, 기존 배포 스크립트로
+  `gh-pages` `0a7359e`에 배포 완료. 배포 스크립트의 필수 테스트/빌드도 통과.
+- 공개 사이트에서 `index-DVLj0EiE.js`와 최상단 O/X 질문 확인.
+  `node scripts/browser_qa.cjs --live-smoke`: HTTP 200, 질문/버튼 2개 표시,
+  390px 가로 넘침과 브라우저 오류 없음.
+- 두 새 plist를 `~/Library/LaunchAgents/`에 설치하고 등록 완료.
+  API는 `running`, 예약 작업은 Hour=23 / Minute=0으로 대기 중.
+  실제 야간 발송 시각은 아직 도래하지 않았으며 발송 분기는 mock으로 검증했다.
+- 기존 Funnel 경로를 보존하며 `/routine-api`만 추가. 공개 HTTPS health 200,
+  사이트 Origin의 CORS preflight 200, 무인증 응답 변경 요청 401 확인.
+- 메인컨트롤 DM으로 연결 링크 발송 성공(`pairing_message_sent=true`).
+  사용자가 평소 기록하는 브라우저/홈 화면 앱을 한 번 연결하면 미응답 알림이 활성화된다.
 - 기존 README의 `main push → Actions` 설명과 실제 `scripts/deploy.sh`의
   `npm run deploy → gh-pages` 배포 방식이 다름. 기존 운영 문서 교정은 이번 범위에 포함하지 않음.

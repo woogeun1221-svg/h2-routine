@@ -35,6 +35,19 @@ const server = http.createServer((req, res) => {
     const page = await context.newPage();
     const errors = [], sent = [];
     page.on('pageerror', error => errors.push(error.message));
+    if (process.argv.includes('--live-smoke')) {
+      const response = await page.goto('https://woogeun1221-svg.github.io/h2-routine/', { waitUntil: 'networkidle' });
+      assert.equal(response.status(), 200);
+      assert.equal(await page.locator('#reflection .reflection-question').textContent(),
+        '가슴에 손을 얹고 스스로에게 만족할만한 하루를 보냈는가?');
+      assert.equal(await page.locator('#reflection .reflection-choices button').count(), 2);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      assert.deepEqual(errors, []);
+      await page.screenshot({ path: path.join(report, 'production-390.png') });
+      console.log(JSON.stringify({ production: true, status: response.status(), questionVisible: true,
+        choices: 2, browserErrors: errors.length, screenshot: path.join(report, 'production-390.png') }));
+      return;
+    }
     await page.addInitScript(data => {
       if (!localStorage.getItem('h2-routine-v1')) localStorage.setItem('h2-routine-v1', JSON.stringify(data));
     }, seed);
