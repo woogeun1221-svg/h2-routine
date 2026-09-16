@@ -61,15 +61,14 @@
     <!-- ================= 추이 ================= -->
     <div id="screen-trends" style="display:none">
       <section id="reflectionHistory" class="reflection-history" aria-label="하루 만족도 기록"></section>
-      <div class="chips">
-        <div class="chip">현재 스트릭<b id="curStreak">0일</b></div>
-        <div class="chip">최장 스트릭<b id="maxStreak">0일</b></div>
-      </div>
-
       <div class="cal-section">
+        <div class="btns seg calendar-modes" role="group" aria-label="캘린더 종류">
+          <button class="btn" data-calendar-mode="self" aria-pressed="true">하루 만족도</button>
+          <button class="btn" data-calendar-mode="routine" aria-pressed="false">루틴 달성</button>
+        </div>
         <div class="strip-head">
-          <span class="strip-title">캘린더</span>
-          <span class="legend">
+          <span class="strip-title" id="calendarTitle">하루 만족도</span>
+          <span class="legend" id="calendarLegend">
             <span><i style="background:var(--red)"></i>정상</span>
             <span><i style="background:var(--brass)"></i>최소</span>
             <span><i style="background:var(--blue)"></i>미달</span>
@@ -83,8 +82,16 @@
           </div>
           <div class="cal-wd" id="calWd"></div>
           <div class="cal-grid" id="calGrid"></div>
+          <div id="reflectionDay" class="reflection-day" hidden></div>
         </div>
       </div>
+
+      <div class="chips" id="routineStreaks" hidden>
+        <div class="chip">루틴 현재 스트릭<b id="curStreak">0일</b></div>
+        <div class="chip">루틴 최장 스트릭<b id="maxStreak">0일</b></div>
+      </div>
+
+      <section id="reflectionArchive" class="reflection-archive" aria-label="X 사유 아카이브"></section>
 
       <div class="habit-section">
         <div class="strip-head"><span class="strip-title" id="habitTitle">습관별</span></div>
@@ -96,7 +103,7 @@
         </div>
         <div class="wife-line" id="wifeLine"></div>
         <div class="table-note">
-          습관별 정상 = 그 습관 목표만 충족한 날 / 장부·캘린더 정상 = 세 습관 모두 + 송은 X 없음.
+          습관별 정상 = 그 습관 목표만 충족한 날 / 장부·루틴 달성 캘린더 정상 = 세 습관 모두 + 송은 X 없음.
           투자 원칙(주) = 금요일까지 정상 · 주말 완료 최소 · 일요일까지 미완료 미달.
           진행 중인 주는 제외하며 금요일이 속한 달에 집계한다.
           두 기준이 다르므로 회고 인용 시 구분할 것.

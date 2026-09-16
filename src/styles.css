@@ -145,9 +145,38 @@ h1.date .dplus { font-size: 13px; font-weight: 600; color: var(--faint); margin-
 .reflection-footer span { font-size: 11px; line-height: 1.6; color: var(--muted); }
 .reflection-footer .reset { flex-shrink: 0; min-height: 44px; }
 .reflection-history { margin-top: 20px; }
+.reflection-section-title { font-size: 18px; font-weight: 600; }
+.reflection-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.reflection-stat { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.reflection-stat span { display: block; font-size: 11px; }
+.reflection-stat b { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 21px; margin-top: 5px; }
+.reflection-months { max-height: 184px; overflow-y: auto; }
+.reflection-months caption { text-align: left; padding: 12px 13px 0; font-size: 12px; color: var(--muted); }
+.reflection-months .selected-month { background: var(--brass-dim); }
+.archive-jump { margin-top: 3px; padding-left: 0; color: var(--brass); min-height: 40px; }
+.calendar-modes { margin: 0 0 14px; }
+.reflection-cell { flex-direction: column; gap: 2px; border: 0; cursor: pointer; line-height: 1.2; }
+.reflection-cell span { font-size: 9px; }
+.reflection-cell b { font-size: 13px; }
+.reflection-cell.reflection-o { background: var(--red-dim); color: var(--red); }
+.reflection-cell.reflection-x { background: var(--blue-dim); color: var(--blue); }
+.reflection-cell:focus-visible { outline: 2px solid var(--brass); }
+.reflection-day { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
+.reflection-day p { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.reflection-archive { margin-top: 26px; scroll-margin-top: 22px; }
+.archive-tools { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 8px; margin-top: 14px; }
+.archive-tools select, .archive-tools input {
+  min-width: 0; width: 100%; min-height: 44px; padding: 8px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface2); color: var(--text); font: inherit; font-size: 14px;
+}
+.archive-tools input { font-size: 16px; }
 .reflection-entry { margin-top: 9px; padding: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
-.reflection-entry summary { cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+.archive-entry-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 12px; }
+.archive-entry-head time { font-family: 'IBM Plex Mono', monospace; }
+.archive-retained, .archive-empty-reason { color: var(--muted); }
 .reflection-entry p { margin-top: 10px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.archive-more, .archive-export { display: block; width: 100%; margin-top: 12px; font-family: inherit; font-size: 13px; }
+.archive-more[hidden], #routineStreaks[hidden], #reflectionDay[hidden] { display: none; }
 .self-o { color: var(--red); }
 .self-x { color: var(--blue); }
 .reminder-connect { margin-top: 12px; }

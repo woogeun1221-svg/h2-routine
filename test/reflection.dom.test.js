@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderReflection, renderReflectionHistory, REFLECTION_QUESTION } from '../src/views/reflection.js';
+import { renderReflection, renderReflectionHistory, renderReflectionArchive, REFLECTION_QUESTION } from '../src/views/reflection.js';
 import { importText, exportText, validateState } from '../src/storage.js';
 import { statusOf, todayStr } from '../src/logic.js';
 
@@ -10,7 +10,7 @@ const handlers = { setReflection: vi.fn(), setReflectionReason: vi.fn() };
 
 describe('하루 만족도', () => {
   beforeEach(() => {
-    document.body.innerHTML = '<section id="reflection"></section><section id="reflectionHistory"></section>';
+    document.body.innerHTML = '<section id="reflection"></section><section id="reflectionHistory"></section><section id="reflectionArchive"></section>';
     vi.clearAllMocks();
   });
 
@@ -47,17 +47,52 @@ describe('하루 만족도', () => {
     expect(validateState({ ...state, days: { [day]: { selfReason: {} } } })).toContain('.selfReason');
   });
 
-  it('이전 달 기록과 HTML 입력을 안전하게 다시 보여준다', () => {
+  it('모든 달의 사유를 펼쳐 보이고 HTML 입력은 텍스트로 안전하게 표시한다', () => {
     const state = { startDate: day, days: {
       [day]: { self: 'x', selfReason: '<img src=x onerror=alert(1)>' },
-      '2026-08-31': { self: 'o' }
+      '2026-08-31': { self: 'o', selfReason: '지난달에 남긴 사유' }
     } };
-    renderReflectionHistory(state, '2026-09');
-    expect(document.querySelectorAll('details').length).toBe(1);
-    expect(document.querySelector('details p').textContent).toContain('<img');
+    renderReflectionArchive(state, day);
+    expect(document.querySelectorAll('.reflection-entry').length).toBe(2);
+    expect(document.querySelector('.reflection-entry p').textContent).toContain('<img');
     expect(document.querySelector('img')).toBeNull();
-    renderReflectionHistory(state, '2026-08');
-    expect(document.querySelector('summary').textContent).toBe('08.31 · O');
+    expect(document.querySelectorAll('.reflection-entry')[1].textContent).toContain('현재 O · 보관된 사유');
+    renderReflectionHistory(state, '2026-08', day);
+    expect(document.querySelector('.reflection-stat b').textContent).toBe('1일');
+  });
+
+  it('아카이브 검색과 기간 필터를 적용하고 입력칸과 필터 상태를 유지한다', () => {
+    const state = { startDate: day, days: {
+      [day]: { self: 'x', selfReason: '오늘은 운동을 미뤘다' },
+      '2026-08-31': { self: 'x', selfReason: '지난달 독서를 미뤘다' }
+    } };
+    const filters = { month: 'all', query: '', limit: 20 };
+    renderReflectionArchive(state, day, filters);
+    const input = document.getElementById('archiveSearch');
+    input.value = '독서'; input.dispatchEvent(new Event('input'));
+    expect(document.querySelectorAll('.reflection-entry').length).toBe(1);
+    expect(document.querySelector('.reflection-entry').dataset.day).toBe('2026-08-31');
+    expect(document.getElementById('archiveSearch')).toBe(input);
+    const month = document.getElementById('archiveMonth');
+    month.value = '2026-09'; month.dispatchEvent(new Event('change'));
+    expect(document.querySelectorAll('.reflection-entry').length).toBe(0);
+    renderReflectionArchive(state, day, filters);
+    expect(document.getElementById('archiveSearch').value).toBe('독서');
+    expect(document.getElementById('archiveMonth').value).toBe('2026-09');
+  });
+
+  it('오래된 사유를 더 볼 수 있으며 내보내기는 화면 필터와 별개로 제공한다', () => {
+    const days = Object.fromEntries(Array.from({ length: 25 }, (_, i) => [
+      '2026-08-' + String(i + 1).padStart(2, '0'), { self: 'x', selfReason: '사유 ' + i }
+    ]));
+    const exportArchive = vi.fn();
+    renderReflectionArchive({ days }, day, undefined, { exportArchive });
+    expect(document.querySelectorAll('.reflection-entry').length).toBe(20);
+    document.querySelector('.archive-more').click();
+    expect(document.querySelectorAll('.reflection-entry').length).toBe(25);
+    expect(document.querySelector('.archive-more').hidden).toBe(true);
+    document.querySelector('.archive-export').click();
+    expect(exportArchive).toHaveBeenCalledOnce();
   });
 
   it('한국 자정에 날짜가 바뀐다', () => {

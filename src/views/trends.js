@@ -1,24 +1,41 @@
 /* 추이 화면 — 스트릭 요약, 월 캘린더 히트맵, 습관별 월간 통계, 월별 장부.
    모든 확정 수치는 어제까지 기준 (오늘은 진행중 — 히트맵에서만 시각 표시). */
 import {
-  streak, longestStreak, monthList, calMonth, habitMonthStats, monthlyRows
+  streak, longestStreak, monthList, calMonth, habitMonthStats, monthlyRows, getDay
 } from '../logic.js';
-import { renderReflectionHistory } from './reflection.js';
+import { renderReflectionHistory, renderReflectionArchive, showReflectionDay } from './reflection.js';
 
 var WD = ['일', '월', '화', '수', '목', '금', '토'];
 
-export function renderTrends(state, t, ym) {
-  renderReflectionHistory(state, ym);
+export function renderTrends(state, t, ym, options = {}) {
+  const mode = options.mode || 'self';
+  renderReflectionHistory(state, ym, t);
+  renderReflectionArchive(state, t, options.archiveFilters, options);
   document.getElementById('curStreak').textContent = streak(state, t) + '일';
   document.getElementById('maxStreak').textContent = longestStreak(state, t) + '일';
 
-  renderCalendar(state, t, ym);
+  document.querySelectorAll('[data-calendar-mode]').forEach(button => {
+    const selected = button.dataset.calendarMode === mode;
+    button.setAttribute('aria-pressed', String(selected));
+    button.classList.toggle('sel-o', selected);
+  });
+  const streaks = document.getElementById('routineStreaks');
+  if (streaks) streaks.hidden = mode !== 'routine';
+  renderCalendar(state, t, ym, mode);
   renderHabitStats(state, t, ym);
   renderMonthly(state, t);
 }
 
-function renderCalendar(state, t, ym) {
+function renderCalendar(state, t, ym, mode) {
   document.getElementById('calLabel').textContent = ym.replace('-', '.');
+  const title = document.getElementById('calendarTitle');
+  if (title) title.textContent = mode === 'self' ? '하루 만족도' : '루틴 달성';
+  const legend = document.getElementById('calendarLegend');
+  if (legend) legend.innerHTML = mode === 'self' ?
+    '<span class="self-o">O 만족</span><span class="self-x">X 불만족</span><span>— 미응답</span>' :
+    '<span><i style="background:var(--red)"></i>정상</span><span><i style="background:var(--brass)"></i>최소</span><span><i style="background:var(--blue)"></i>미달</span>';
+  const detail = document.getElementById('reflectionDay');
+  if (detail) { detail.hidden = true; detail.replaceChildren(); }
 
   var months = monthList(state, t);
   var first = months[0] || ym, last = months[months.length - 1] || ym;
@@ -39,6 +56,20 @@ function renderCalendar(state, t, ym) {
     grid.appendChild(blank);
   }
   cal.cells.forEach(function (c) {
+    if (mode === 'self' && c.kind !== 'out' && c.kind !== 'future') {
+      const entry = getDay(state, c.ds);
+      const answer = ['o', 'x'].includes(entry.self) ? entry.self : null;
+      const button = document.createElement('button');
+      button.type = 'button'; button.dataset.day = c.ds;
+      button.className = 'cal-cell reflection-cell reflection-' + (answer || 'unanswered') + (c.ds === t ? ' today' : '');
+      button.setAttribute('aria-label', c.ds + ' · ' + (answer?.toUpperCase() || '미응답'));
+      const date = document.createElement('span'); date.textContent = c.day;
+      const mark = document.createElement('b'); mark.textContent = answer?.toUpperCase() || '—';
+      button.append(date, mark);
+      button.addEventListener('click', () => showReflectionDay(state, c.ds));
+      grid.appendChild(button);
+      return;
+    }
     var cell = document.createElement('div');
     cell.className = 'cal-cell ' + c.kind + (c.ds === t ? ' today' : '');
     cell.textContent = c.kind === 'out' ? '' : c.day;

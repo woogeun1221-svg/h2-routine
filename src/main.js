@@ -13,6 +13,7 @@ import { renderToday } from './views/today.js';
 import { renderTrends } from './views/trends.js';
 import { renderSettings } from './views/settings.js';
 import { createReminderClient, reminderStatusText } from './reminders.js';
+import { reflectionArchiveText } from './reflection.js';
 
 /* 새 배포 감지: 로드 시 1회 + 앱 재개(resume)마다 체크 — iOS standalone은
    suspend→resume에서 리로드가 없어 이게 없으면 콜드 스타트까지 옛 버전에 머문다. */
@@ -27,6 +28,8 @@ var undoStack = { p: [], s: [], r: [] };
 var renderedDate = null;
 var activeTab = 'today';       // 'today' | 'trends' | 'settings'
 var trendYm = null;            // 추이 화면에서 보고 있는 달 — 진입 시 이번 달로 리셋
+var calendarMode = 'self';
+var archiveFilters = { month: 'all', query: '', limit: 20 };
 var reminders = createReminderClient({ onStatus: renderReminderStatus });
 
 function renderReminderStatus() {
@@ -154,7 +157,12 @@ function render() {
     });
   } else if (activeTab === 'trends') {
     if (!trendYm) trendYm = t.slice(0, 7);
-    renderTrends(state, t, trendYm);
+    renderTrends(state, t, trendYm, {
+      mode: calendarMode, archiveFilters: archiveFilters,
+      exportArchive: function () {
+        downloadTextFile(reflectionArchiveText(state, todayStr()), 'h2-reflection-archive-' + todayStr() + '.md', 'text/markdown');
+      }
+    });
   } else {
     renderSettings(state, { setGoal: setGoal });
   }
@@ -172,6 +180,9 @@ document.getElementById('calPrev').addEventListener('click', function () {
 document.getElementById('calNext').addEventListener('click', function () {
   trendYm = shiftMonth(trendYm, 1); render();
 });
+document.querySelectorAll('[data-calendar-mode]').forEach(function (button) {
+  button.addEventListener('click', function () { calendarMode = button.dataset.calendarMode; render(); });
+});
 
 /* ---------- export / import / reset (설정 화면) ---------- */
 document.getElementById('exportBtn').addEventListener('click', function () {
@@ -186,10 +197,12 @@ document.getElementById('exportBtn').addEventListener('click', function () {
 
 /* 파일 내보내기 — iOS에선 공유 시트(파일 앱·에어드랍)가 가장 확실, 그 외엔 다운로드 */
 document.getElementById('exportFileBtn').addEventListener('click', function () {
-  var json = exportText(state);
-  var name = 'h2-routine-' + todayStr() + '.json';
+  downloadTextFile(exportText(state), 'h2-routine-' + todayStr() + '.json', 'application/json');
+});
+
+function downloadTextFile(text, name, type) {
   var file;
-  try { file = new File([json], name, { type: 'application/json' }); } catch (e) { file = null; }
+  try { file = new File([text], name, { type: type }); } catch (e) { file = null; }
   if (file && navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
     navigator.share({ files: [file] }).catch(function (e) {
       if (e && e.name === 'AbortError') return; // 사용자가 시트를 닫음
@@ -199,13 +212,13 @@ document.getElementById('exportFileBtn').addEventListener('click', function () {
   }
   downloadFallback();
   function downloadFallback() {
-    var url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    var url = URL.createObjectURL(new Blob([text], { type: type }));
     var a = document.createElement('a');
     a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
   }
-});
+}
 
 function applyImport(text) {
   var incoming;

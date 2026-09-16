@@ -8,7 +8,7 @@ function mountSkeleton() {
     <b id="curStreak"></b><b id="maxStreak"></b>
     <button id="calPrev"></button><span id="calLabel"></span><button id="calNext"></button>
     <div id="calWd"></div>
-    <div id="calGrid"></div>
+    <div id="calGrid"></div><div id="reflectionDay" hidden></div>
     <span id="habitTitle"></span>
     <table><tbody id="habitBody"></tbody></table>
     <div id="wifeLine"></div>
@@ -40,7 +40,7 @@ describe('renderTrends DOM 스모크', () => {
 
   it('히트맵 셀 상태 클래스 — 확정/오늘 진행중/미래', () => {
     const state = { startDate: '2026-07-20', days: { '2026-07-20': FULL } };
-    renderTrends(state, '2026-07-22', '2026-07');
+    renderTrends(state, '2026-07-22', '2026-07', { mode: 'routine' });
     const cells = document.querySelectorAll('#calGrid .cal-cell:not(.out)');
     // 20일=full, 21일=miss(미기록), 22일=pending+today, 23일~=future
     expect(cells[0].className).toContain('full');
@@ -48,6 +48,21 @@ describe('renderTrends DOM 스모크', () => {
     expect(cells[2].className).toContain('pending');
     expect(cells[2].className).toContain('today');
     expect(cells[3].className).toContain('future');
+  });
+
+  it('만족도 달력은 기본 화면이며 루틴 달성 여부와 별개로 O/X·미응답을 표시한다', () => {
+    const state = { startDate: '2026-07-20', days: {
+      '2026-07-20': { ...FULL, self: 'x', selfReason: '횟수는 채웠지만 만족하지 못함' },
+      '2026-07-21': { self: 'o' }
+    } };
+    renderTrends(state, '2026-07-22', '2026-07');
+    const cells = document.querySelectorAll('#calGrid button');
+    expect(cells[0].textContent).toBe('20X');
+    expect(cells[1].textContent).toBe('21O');
+    expect(cells[2].textContent).toBe('22—');
+    cells[0].click();
+    expect(document.getElementById('reflectionDay').hidden).toBe(false);
+    expect(document.getElementById('reflectionDay').textContent).toContain('횟수는 채웠지만 만족하지 못함');
   });
 
   it('단일 월이면 prev/next 모두 disabled', () => {
