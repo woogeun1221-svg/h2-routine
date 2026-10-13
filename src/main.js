@@ -26,7 +26,7 @@ registerSW({
 var state = load(todayStr());
 var undoStack = { p: [], s: [], r: [] };
 var renderedDate = null;
-var activeTab = 'today';       // 'today' | 'trends' | 'settings'
+var activeTab = 'today';       // 'today' | 'trends' | 'iron' | 'settings'
 var trendYm = null;            // 추이 화면에서 보고 있는 달 — 진입 시 이번 달로 리셋
 var calendarMode = 'self';
 var archiveFilters = { month: 'all', query: '', limit: 20 };
@@ -129,7 +129,23 @@ function resetGoals() {
 }
 
 /* ---------- tabs ---------- */
-var SCREENS = { today: 'screen-today', trends: 'screen-trends', settings: 'screen-settings' };
+var SCREENS = { today: 'screen-today', trends: 'screen-trends', iron: 'screen-iron', settings: 'screen-settings' };
+
+/* ---------- 헬스 탭 (Iron Terminal, React) — 처음 열 때만 지연 로드·마운트 ----------
+   Iron 은 자기 localStorage 키(ironterminal:v1)를 쓰고 루틴 기록과 섞이지 않는다.
+   청크는 PWA 서비스워커가 프리캐시하므로 한 번 연 뒤엔 오프라인에서도 열린다. */
+var ironMounted = false;
+function mountIronTab() {
+  if (ironMounted) return;
+  ironMounted = true;
+  import('./iron/mount.tsx').then(function (m) {
+    m.mountIron(document.getElementById('screen-iron'));
+  }, function (e) {
+    ironMounted = false;
+    document.getElementById('screen-iron').textContent =
+      '헬스 화면을 불러오지 못했어 — ' + (e && e.message ? e.message : '네트워크를 확인해줘.');
+  });
+}
 
 function switchTab(tab) {
   activeTab = tab;
@@ -163,6 +179,8 @@ function render() {
         downloadTextFile(reflectionArchiveText(state, todayStr()), 'h2-reflection-archive-' + todayStr() + '.md', 'text/markdown');
       }
     });
+  } else if (activeTab === 'iron') {
+    mountIronTab();
   } else {
     renderSettings(state, { setGoal: setGoal });
   }

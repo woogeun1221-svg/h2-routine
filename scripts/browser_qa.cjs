@@ -10,10 +10,13 @@ const report = '/private/tmp/h2-routine-qa';
 const api = 'https://macmini.taile484c7.ts.net/routine-api';
 const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
 const oldRecord = { p: 100, s: 30, r: 20, w: 'o', i: true, self: 'x', selfReason: '오래된 사유도 아카이브에 남는다.' };
+// 선택 월 O 비율 50% 기대: 이번 달 1일 O + 오늘 X. 9월 고정 날짜는 달이 바뀌면 0%가 돼 깨졌다(2026-10-13).
+const firstOfMonth = date.slice(0, 8) + '01';
 const seed = { startDate: '2026-08-19', investmentReviewStart: '2026-08-19',
   days: { '2026-08-19': oldRecord,
     '2026-08-20': { self: 'o', selfReason: 'O로 바꾼 뒤에도 남겨둔 사유' },
-    '2026-09-01': { self: 'o' }, [date]: { p: 30, s: 30, r: 5, w: null } } };
+    ...(firstOfMonth === date ? {} : { [firstOfMonth]: { self: 'o' } }),
+    [date]: { p: 30, s: 30, r: 5, w: null } } };
 const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
   '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml',
   '.png': 'image/png', '.woff': 'font/woff', '.woff2': 'font/woff2' };
@@ -137,6 +140,29 @@ const server = http.createServer((req, res) => {
     await page.getByRole('button', { name: 'X 만족하지 못했다', exact: true }).click();
     await page.waitForFunction(() => document.getElementById('reminderStatus').textContent.includes('응답 전달됨'));
 
+    // 헬스 탭: Iron Terminal 이 embedded 셸로 뜨고(헤더+보조 메뉴, 하단 네비 없음),
+    // 루틴 화면의 버튼 스타일은 Iron CSS 에 오염되지 않아야 한다.
+    const routineTabFont = await page.locator('.tabbar .tab').first().evaluate(el => getComputedStyle(el).fontFamily);
+    await page.locator('[data-tab="iron"]').click();
+    await page.locator('#screen-iron.iron-root .iron-top .header').waitFor();
+    assert.equal(await page.locator('#screen-iron .iron-subnav .iron-subnav-item').count(), 5);
+    assert.equal(await page.locator('#screen-iron .bottomnav').count(), 0);
+    assert((await page.locator('#screen-iron .header').innerText()).includes('상체'));
+    await page.locator('#screen-iron .iron-subnav-item.is-input').click();
+    assert.equal(await page.locator('#screen-iron .iron-subnav-item.is-input').getAttribute('aria-selected'), 'true');
+    await page.locator('#screen-iron .iron-subnav-item').first().click();
+    assert.equal(await page.locator('.tabbar .tab').first().evaluate(el => getComputedStyle(el).fontFamily), routineTabFont);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.body).fontFamily.includes('IBM Plex Sans KR')), true);
+    for (const width of [390, 320, 1200]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await page.screenshot({ path: path.join(report, 'iron-' + width + '.png'), fullPage: true });
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('[data-tab="today"]').click();
+    assert.equal(await page.locator('#screen-iron').isVisible(), false);
+    assert.equal(await page.locator('#cards .card').count(), 5);
+
     await page.locator('[data-tab="trends"]').click();
     for (const width of [390, 320, 1200]) {
       await page.setViewportSize({ width, height: 844 });
@@ -145,7 +171,8 @@ const server = http.createServer((req, res) => {
     }
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ passed: true, widths: [390, 320, 1200], browserErrors: errors.length,
-      legacyRecordsPreserved: true, reasonReloaded: true, crossMonthArchiveAndDownloads: true, apiMocked: true, screenshots: report }));
+      legacyRecordsPreserved: true, reasonReloaded: true, crossMonthArchiveAndDownloads: true, ironTabMounted: true,
+      apiMocked: true, screenshots: report }));
   } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));

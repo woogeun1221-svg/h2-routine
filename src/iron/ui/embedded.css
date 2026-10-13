@@ -1,0 +1,28 @@
+/* 루틴 앱 '헬스' 탭 안에서의 셸 보정. 빌드 시 .iron-root 아래로만 적용된다(vite.config.js). */
+.iron-top { position: sticky; top: 0; z-index: 30; }
+.iron-top .header { position: static; }
+.iron-subnav {
+  display: flex; gap: 6px; padding: 8px 14px; overflow-x: auto;
+  background: color-mix(in srgb, var(--bg-0) 92%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  scrollbar-width: none;
+}
+.iron-subnav::-webkit-scrollbar { display: none; }
+.iron-subnav-item {
+  flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 36px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--bg-1); color: var(--text-dim);
+  font: 600 12px/1 var(--font-kr); letter-spacing: .04em; white-space: nowrap;
+}
+.iron-subnav-item[aria-selected="true"] { color: var(--text); border-color: var(--up-line); background: var(--up-soft); }
+.iron-subnav-item.is-input { color: var(--up); }
+/* 호스트가 문서 스크롤을 담당 — 뷰포트 높이 강제·내부 스크롤·하단 네비 여백 불필요 */
+.app { min-height: 0; }
+.screen { overflow-y: visible; padding-bottom: 24px; }
+
+/* 좁은 폭 보정 — 호스트 .app 은 최대 440px, 320px 폰에서도 헤더 한 줄이 문서 폭을 넘지 않게 */
+.header-row { flex-wrap: wrap; gap: 8px 10px; }
+.day-chip { white-space: nowrap; }
+.iron-subnav { gap: 5px; padding: 8px 12px; }
+.iron-subnav-item { flex: 0 0 auto; gap: 5px; padding: 0 9px; font-size: 11.5px; }

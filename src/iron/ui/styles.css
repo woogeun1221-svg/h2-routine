@@ -1,0 +1,1193 @@
+/**
+ * Iron Terminal — 비주얼 언어 단일 시트.
+ * "트레이딩 터미널 × 헬스 로그" 미학. 모바일 우선 · 다크.
+ *
+ * 규칙:
+ * - 색은 전부 :root CSS 변수로. 하드코딩 hex 금지(변수 없는 예외만).
+ * - 숫자/데이터 폰트 = var(--font-mono)(IBM Plex Mono, tabular-nums).
+ * - 한글 = var(--font-kr)(IBM Plex Sans KR), 폴백 시스템 한글.
+ * - up-red(#f6465d) = 상승/신기록/목표 달성/증량. "나쁨" 의미 아님.
+ * - 하락(파랑)은 드묾. hold(amber)는 유지/경고. pr-gold는 PR.
+ * - 세이프에어리어 env(safe-area-inset-*)로 노치/홈 인디케이터 대응.
+ */
+
+/* ───────────────────────────────────────────────────────────
+   폰트 (@fontsource self-host — main.tsx 에서 woff2 import)
+   여기서는 family 이름만 변수로 선언. CDN 금지.
+   ─────────────────────────────────────────────────────────── */
+:root {
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-kr: "IBM Plex Sans KR", -apple-system, "Apple SD Gothic Neo",
+    "Segoe UI", sans-serif;
+
+  /* 배경 계층 (어두운 → 밝은 표면) */
+  --bg-0: #0a0e14; /* 앱 바탕 */
+  --bg-1: #12161f; /* 카드 */
+  --bg-2: #1b212c; /* 카드 위 요소 / 입력 */
+  --line: #2a3140; /* 경계선 */
+
+  /* 텍스트 */
+  --text: #e6edf3;
+  --text-dim: #9aa4b2;
+  --text-faint: #6b7280;
+
+  /* 값 색 */
+  --up: #f6465d; /* 상승·신기록·목표 달성·증량 (핵심 강조) */
+  --up-soft: rgba(246, 70, 93, 0.14); /* 상승 배경 / 그라데이션 필 */
+  --up-line: rgba(246, 70, 93, 0.55); /* 옅은 라인/보더 */
+  --down: #2f81f7; /* 드문 하락 = 파랑 */
+  --down-soft: rgba(47, 129, 247, 0.14);
+  --hold: #d29922; /* 유지 / 경고(amber) */
+  --hold-soft: rgba(210, 153, 34, 0.14);
+  --pr-gold: #ffd866; /* 개인 신기록 */
+  --pr-gold-soft: rgba(255, 216, 102, 0.14);
+
+  /* 반경 / 그림자 / 간격 */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-fab: 0 6px 18px rgba(246, 70, 93, 0.4);
+
+  /* 하단 네비 높이(콘텐츠 하단 패딩 계산에 재사용) */
+  --bottomnav-h: 58px;
+  --header-h: 52px;
+
+  /* 세이프에어리어(폴백 0) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  color-scheme: dark;
+}
+
+/* ───────────────────────────────────────────────────────────
+   리셋 / 베이스
+   ─────────────────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg-0);
+  color: var(--text);
+  font-family: var(--font-kr);
+  /* 데이터가 많은 앱 — 기본으로 숫자 정렬을 tabular 로 */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* iOS 고무줄 스크롤 시 바탕색 노출 방지 */
+  overscroll-behavior-y: none;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* 데이터/숫자 요소는 모노 + tabular. 클래스로 opt-in. */
+.mono,
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+a {
+  color: var(--down);
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+}
+
+/* 입력 기본 확대 방지(iOS): 16px 미만 지양 */
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* 접근성: 모션 축소 선호 시 애니메이션 제거 */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────
+   앱 셸 — sticky 헤더 + 스크롤 본문 + 고정 하단 네비
+   ─────────────────────────────────────────────────────────── */
+.app {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 상단 헤더(ProgramTabs + 스트릭 + Day 칩) */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--bg-0) 88%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+  padding: calc(var(--safe-top) + 8px) calc(var(--safe-right) + 14px) 8px
+    calc(var(--safe-left) + 14px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* 본문 스크롤 영역. 하단 네비 + FAB 높이만큼 패딩 확보. */
+.screen {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px calc(var(--safe-right) + 14px)
+    calc(var(--bottomnav-h) + var(--safe-bottom) + 24px)
+    calc(var(--safe-left) + 14px);
+  /* 콘텐츠는 폰 우선이지만 태블릿에서 과도히 넓지 않게 */
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.screen-title {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+.screen-sub {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin: 0 0 14px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   ProgramTabs — [ 상체 | 하체 ] 세그먼트
+   ─────────────────────────────────────────────────────────── */
+.program-tabs {
+  display: inline-flex;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 3px;
+  gap: 3px;
+}
+
+.program-tab {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 7px 20px;
+  border-radius: 9px;
+  transition: color 0.12s, background 0.12s;
+  white-space: nowrap;
+}
+
+.program-tab[aria-selected="true"] {
+  background: var(--up-soft);
+  color: var(--up);
+}
+
+/* ───────────────────────────────────────────────────────────
+   ChartsScreen — 종목 칩 피커 + 차트 세로 스택
+   ─────────────────────────────────────────────────────────── */
+.charts-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 종목 칩 행: 세그먼트 룩은 유지하되, 칩이 많아 넘칠 때는
+   페이지가 아니라 이 컨테이너 안에서만 가로 스크롤되게 한다(모바일 스펙). */
+.charts-picker {
+  display: flex;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.charts-picker::-webkit-scrollbar {
+  display: none;
+}
+
+.charts-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   BottomNav — 5칸 (홈 / 차트 / +FAB / 히스토리 / 캘린더)
+   ─────────────────────────────────────────────────────────── */
+.bottomnav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  height: calc(var(--bottomnav-h) + var(--safe-bottom));
+  padding: 0 calc(var(--safe-right)) var(--safe-bottom)
+    calc(var(--safe-left));
+  background: color-mix(in srgb, var(--bg-1) 94%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+}
+
+.nav-item {
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: var(--bottomnav-h);
+  font-size: 10px;
+  font-weight: 600;
+  transition: color 0.12s;
+}
+
+.nav-item[aria-selected="true"] {
+  color: var(--up);
+}
+
+.nav-item svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* 가운데 돌출 FAB(＋기록) */
+.nav-fab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-fab-btn {
+  position: absolute;
+  bottom: 10px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: var(--up);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-fab);
+  transition: transform 0.12s;
+}
+
+.nav-fab-btn:active {
+  transform: scale(0.94);
+}
+
+.nav-fab-btn svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   카드 / 표면
+   ─────────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.card + .card {
+  margin-top: 12px;
+}
+
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.card-sub {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+/* 히어로 강조 카드(오늘 할 차례 등) */
+.card.hero {
+  border-color: var(--up-line);
+  background: linear-gradient(
+    180deg,
+    var(--up-soft) 0%,
+    var(--bg-1) 42%
+  );
+}
+
+/* ───────────────────────────────────────────────────────────
+   StatTile / Ticker — 현재 값 표시 스타일
+   ─────────────────────────────────────────────────────────── */
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stat-label {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.stat-unit {
+  font-size: 14px;
+  color: var(--text-dim);
+  font-weight: 500;
+  margin-left: 2px;
+}
+
+.stat-note {
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+/* 현재 값 행: 이름 · 값 · 델타 */
+.ticker {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.ticker + .ticker {
+  border-top: 1px solid var(--line);
+}
+
+.ticker-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ticker-sub {
+  color: var(--text-faint);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.ticker-price {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* ───────────────────────────────────────────────────────────
+   DeltaChip — ▲/▼ 변화량 (up-red 상승 / 파랑 하락 / 무변화 뮤트)
+   ─────────────────────────────────────────────────────────── */
+.delta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.delta-chip.up {
+  color: var(--up);
+  background: var(--up-soft);
+}
+
+.delta-chip.down {
+  color: var(--down);
+  background: var(--down-soft);
+}
+
+.delta-chip.flat {
+  color: var(--text-faint);
+  background: var(--bg-2);
+}
+
+/* ───────────────────────────────────────────────────────────
+   Badge — PR/목표 달성/신기록 등 소형 라벨
+   ─────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.badge.pr {
+  color: var(--pr-gold);
+  background: var(--pr-gold-soft);
+  border: 1px solid color-mix(in srgb, var(--pr-gold) 40%, transparent);
+}
+
+.badge.up {
+  color: var(--up);
+  background: var(--up-soft);
+  border: 1px solid var(--up-line);
+}
+
+.badge.hold {
+  color: var(--hold);
+  background: var(--hold-soft);
+  border: 1px solid color-mix(in srgb, var(--hold) 40%, transparent);
+}
+
+.badge.muted {
+  color: var(--text-dim);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+}
+
+/* Day 칩 (헤더의 오늘 Day) */
+.day-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 4px 10px;
+}
+
+.day-chip .day-lap {
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+}
+
+/* ───────────────────────────────────────────────────────────
+   StreakFlame — 🔥 주간 스트릭 + 이번 주 N/goal 링
+   ─────────────────────────────────────────────────────────── */
+.streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.streak-flame {
+  font-size: 16px;
+  line-height: 1;
+  filter: saturate(1.1);
+}
+
+.streak-count {
+  font-family: var(--font-mono);
+  color: var(--up);
+}
+
+.streak-goal {
+  color: var(--text-dim);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* 이번 주 진행 점 링 (N/goal) */
+.streak-dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.streak-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+}
+
+.streak-dot.filled {
+  background: var(--up);
+  border-color: var(--up);
+}
+
+/* ───────────────────────────────────────────────────────────
+   버튼
+   ─────────────────────────────────────────────────────────── */
+.btn {
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--text);
+  border-radius: var(--r-sm);
+  padding: 11px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: filter 0.12s, transform 0.06s, border-color 0.12s;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* primary = 목표 달성/증량/기록시작 등 핵심 상승 액션 = solid up-red */
+.btn.primary {
+  background: var(--up);
+  border-color: var(--up);
+  color: #fff;
+}
+
+.btn.primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn.ghost {
+  background: transparent;
+}
+
+.btn.hold {
+  background: var(--hold-soft);
+  border-color: var(--hold);
+  color: var(--hold);
+}
+
+.btn.full {
+  width: 100%;
+}
+
+/* ± 스테퍼 */
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--bg-2);
+}
+
+.stepper button {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepper button:active {
+  background: var(--line);
+}
+
+.stepper .stepper-val {
+  min-width: 56px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 17px;
+  font-weight: 700;
+  border-left: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  padding: 0 4px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   입력 필드
+   ─────────────────────────────────────────────────────────── */
+.input {
+  background: var(--bg-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 11px 12px;
+  font-size: 16px; /* iOS 자동 확대 방지 */
+  min-height: 44px;
+  width: 100%;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--up-line);
+  box-shadow: 0 0 0 2px var(--up-soft);
+}
+
+/* 숫자 입력(무게/횟수)은 모노 + 우측 정렬 */
+.input.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.input-label {
+  display: block;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+select.input {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* ───────────────────────────────────────────────────────────
+   SetRow — 세트 입력 행 (44px+ 타깃)
+   ─────────────────────────────────────────────────────────── */
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.set-row .set-index {
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  font-size: 13px;
+  width: 28px;
+  flex-shrink: 0;
+}
+
+/* 12회 달성 → up-red "달성" 강조 */
+.set-row.hit {
+  background: var(--up-soft);
+  border-radius: var(--r-sm);
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.set-row.hit .set-index {
+  color: var(--up);
+}
+
+.set-row-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* 세트 행 묶음(카드 본문) */
+.set-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.set-list .set-row:last-child {
+  border-bottom: none;
+}
+
+/* "이 무게 전 세트 적용" 퀵필 */
+.quickfill {
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+/* InputScreen 셸: 종목 카드 세로 스택 + 하단 저장 액션 */
+.input-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.input-actions {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  margin-top: 4px;
+}
+
+.input-actions .btn.ghost {
+  flex-shrink: 0;
+}
+
+/* ───────────────────────────────────────────────────────────
+   NextTargetBanner — 목표 달성 신호(solid up-red) / 유지(amber)
+   ─────────────────────────────────────────────────────────── */
+.next-banner {
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.next-banner .nb-icon {
+  flex-shrink: 0;
+  display: flex;
+}
+
+.next-banner .nb-sub {
+  font-weight: 500;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+/* 목표 달성 신호(증량 가능) = solid up-red */
+.next-banner.bump {
+  background: var(--up);
+  color: #fff;
+  border: 1px solid var(--up);
+  animation: nb-flash 0.5s ease-out;
+}
+
+/* 미세 플래시(모션 축소 시 위 미디어쿼리로 무력화) */
+@keyframes nb-flash {
+  0% {
+    box-shadow: 0 0 0 0 var(--up-soft);
+  }
+  100% {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+
+/* 유지 = amber */
+.next-banner.hold {
+  background: var(--hold-soft);
+  color: var(--hold);
+  border: 1px solid color-mix(in srgb, var(--hold) 45%, transparent);
+}
+
+/* 자체중량/중립 */
+.next-banner.neutral {
+  background: var(--bg-2);
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+}
+
+/* ───────────────────────────────────────────────────────────
+   차트 프레임 (인라인 SVG 차트를 감싸는 카드)
+   ─────────────────────────────────────────────────────────── */
+.chart-frame {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 12px 12px 6px;
+}
+
+/* SVG 본문: 자식 <svg> 가 viewBox + width:100%/height:auto 로 반응형. */
+.chart-body {
+  width: 100%;
+}
+
+.chart-body svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chart-frame + .chart-frame {
+  margin-top: 12px;
+}
+
+.chart-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.chart-caption {
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+
+/* recharts 커스텀 툴팁 */
+.chart-tooltip {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 7px 10px;
+  font-size: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+.chart-tooltip .tt-label {
+  color: var(--text-dim);
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.chart-tooltip .tt-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* 미니 프로그레스(대시보드 압축 라인) — 높이를 캡해 압축 렌더(비율 유지). */
+.mini-chart .chart-body {
+  display: flex;
+  justify-content: center;
+}
+
+.mini-chart .chart-body svg {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 132px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   캘린더 히트맵
+   ─────────────────────────────────────────────────────────── */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.cal-cell {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* 운동한 날 = up-red 채움(강도별 단계) */
+.cal-cell.lv1 {
+  background: var(--up-soft);
+  border-color: var(--up-line);
+  color: var(--text);
+}
+
+.cal-cell.lv2 {
+  background: color-mix(in srgb, var(--up) 55%, transparent);
+  border-color: var(--up);
+  color: #fff;
+}
+
+.cal-cell.lv3 {
+  background: var(--up);
+  border-color: var(--up);
+  color: #fff;
+}
+
+.cal-cell.today {
+  outline: 2px solid var(--pr-gold);
+  outline-offset: -2px;
+}
+
+.cal-dow {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 600;
+  padding-bottom: 2px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   히스토리 세트 칩 (무게×횟수)
+   ─────────────────────────────────────────────────────────── */
+.set-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.set-chip {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.set-chip.hit {
+  color: var(--up);
+  border-color: var(--up-line);
+  background: var(--up-soft);
+}
+
+/* ───────────────────────────────────────────────────────────
+   EmptyState
+   ─────────────────────────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.empty-state .es-icon {
+  color: var(--text-faint);
+  opacity: 0.7;
+}
+
+.empty-state .es-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.empty-state .es-sub {
+  font-size: 13px;
+  max-width: 280px;
+  line-height: 1.55;
+}
+
+/* ───────────────────────────────────────────────────────────
+   토스트 (🏆 신기록 등) + InstallPrompt + 오프라인 배지
+   ─────────────────────────────────────────────────────────── */
+.toast-layer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--bottomnav-h) + var(--safe-bottom) + 12px);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  padding: 0 16px;
+}
+
+.toast {
+  pointer-events: auto;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  animation: toast-in 0.22s ease-out;
+  max-width: 100%;
+}
+
+.toast.pr {
+  border-color: var(--pr-gold);
+  color: var(--pr-gold);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.install-prompt {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--bottomnav-h) + var(--safe-bottom) + 12px);
+  z-index: 55;
+  background: var(--bg-1);
+  border: 1px solid var(--up-line);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.6);
+}
+
+.install-prompt .ip-text {
+  flex: 1;
+  font-size: 13px;
+}
+
+.install-prompt .ip-text small {
+  display: block;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  margin-top: 2px;
+}
+
+/* 헤더 오프라인 배지 */
+.offline-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--hold);
+  background: var(--hold-soft);
+  border: 1px solid color-mix(in srgb, var(--hold) 40%, transparent);
+  border-radius: 6px;
+  padding: 2px 7px;
+}
+
+/* ───────────────────────────────────────────────────────────
+   유틸리티
+   ─────────────────────────────────────────────────────────── */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.row.between {
+  justify-content: space-between;
+}
+
+.row.wrap {
+  flex-wrap: wrap;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.up {
+  color: var(--up);
+}
+.down {
+  color: var(--down);
+}
+.hold {
+  color: var(--hold);
+}
+.dim {
+  color: var(--text-dim);
+}
+.faint {
+  color: var(--text-faint);
+}
+.gold {
+  color: var(--pr-gold);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.hr {
+  height: 1px;
+  background: var(--line);
+  border: none;
+  margin: 12px 0;
+}
+
+/* 폭이 넓은 콘텐츠(표/차트 축 라벨 등)는 자기 컨테이너에서만 가로 스크롤 */
+.x-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ───────────────────────────────────────────────────────────
+   태블릿/데스크탑 — 모바일 우선 위에 상한만 얹기
+   ─────────────────────────────────────────────────────────── */
+@media (min-width: 720px) {
+  .grid-2 {
+    gap: 16px;
+  }
+  .screen-title {
+    font-size: 24px;
+  }
+}

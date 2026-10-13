@@ -1,8 +1,23 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import prefixSelector from 'postcss-prefix-selector';
+
+/* Iron Terminal(헬스 탭, React)의 CSS 는 전역 셀렉터(:root/html/body/button/input/*)를 쓴다.
+   그대로 두면 루틴 화면의 버튼·입력·토큰을 덮으므로 src/iron/ 아래 CSS 만 .iron-root 로 접두사 처리.
+   :root/html/body 는 컨테이너 자신(.iron-root)으로 바꿔 토큰·폰트·배경이 그 안에서만 산다. */
+const ironScope = prefixSelector({
+  prefix: '.iron-root',
+  includeFiles: [/src\/iron\//],
+  transform(prefix, selector, prefixedSelector) {
+    const s = selector.trim();
+    if (s === ':root' || s === 'html' || s === 'body') return prefix;
+    return prefixedSelector;
+  }
+});
 
 export default defineConfig({
   base: '/h2-routine/',
+  css: { postcss: { plugins: [ironScope] } },
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',

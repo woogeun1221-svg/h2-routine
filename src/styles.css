@@ -344,3 +344,8 @@ td.empty { text-align: center !important; color: var(--faint); font-family: 'IBM
 }
 .settings-info b { color: var(--muted); font-weight: 600; }
 .settings-todo { color: var(--faint); font-style: normal; opacity: .8; }
+
+/* ---------- 헬스 탭 (Iron Terminal 마운트 컨테이너) ----------
+   .app 의 좌우 18px 패딩을 상쇄해 Iron 헤더·보조 메뉴를 화면 폭 그대로 쓴다.
+   Iron 자체 스타일은 빌드 시 .iron-root 아래로만 적용된다. */
+#screen-iron { margin: 0 -18px; }

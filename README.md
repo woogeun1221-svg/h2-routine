@@ -11,12 +11,26 @@
 - 데이터는 기기 localStorage에만 저장 — 서버 없음. 백업은 [데이터 내보내기] JSON.
 - `h2-routine-tracker.html` = v1 프로토타입 (Claude.ai 아티팩트용, 참조 보존)
 
+## 헬스 탭 (Iron Terminal 통합, 2026-10-13)
+
+상체/하체 근력운동 트래커 Iron Terminal(React 19 + TypeScript)을 `헬스` 탭으로 품었다.
+소스는 `src/iron/`(domain·storage·ui), 테스트는 `test/iron/`. 탭을 처음 열 때 `src/iron/mount.tsx`를
+동적 import 해 `#screen-iron`에 마운트하므로 초기 번들은 루틴 그대로이고, 청크는 PWA 가 프리캐시한다.
+
+- Iron 의 전역 CSS(`:root`/`body`/`button`/`input`…)는 빌드 시 `.iron-root` 아래로만 접두사 처리된다
+  (`vite.config.js`의 postcss-prefix-selector). 루틴 화면의 토큰·버튼은 영향을 받지 않는다.
+- embedded 모드: Iron 의 하단 네비·설치 안내·SW 갱신 토스트는 끄고, 헤더 아래 보조 메뉴(홈/차트/기록/히스토리/캘린더)로 대체.
+- 저장 키는 Iron 그대로 `ironterminal:v1`. 루틴 기록 `h2-routine-v1`과 섞이지 않으며 백업도 각자 화면에서 한다.
+- **기존 기록 이사(한 번만)**: 예전 주소 `/iron/` → 설정 → JSON 내보내기, 새 `헬스` 탭 → 설정 → 가져오기. 형식이 같아 변환이 없다.
+- 원본 `~/projects/iron-terminal/`과 launchd `com.woogeun.ironterminal.serve`는 이사 확인 전까지 유지한다.
+
 ## 개발
 
 ```bash
 npm install
 npm run dev        # 로컬 개발 서버
-npm test           # 로직 단위 테스트 (vitest)
+npm test           # 로직 단위 테스트 (vitest, 루틴 + 헬스)
+npm run typecheck  # 헬스(TypeScript) 타입 검사
 npm run icons      # public/icons/ PNG 재생성 (sharp)
 npm run build      # dist/ 빌드 (PWA 포함)
 ```
