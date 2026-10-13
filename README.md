@@ -15,7 +15,7 @@
 
 상체/하체 근력운동 트래커 Iron Terminal(React 19 + TypeScript)을 `헬스` 탭으로 품었다.
 소스는 `src/iron/`(domain·storage·ui), 테스트는 `test/iron/`. 탭을 처음 열 때 `src/iron/mount.tsx`를
-동적 import 해 `#screen-iron`에 마운트하므로 초기 번들은 루틴 그대로이고, 청크는 PWA 가 프리캐시한다.
+동적 import 해 `#screen-iron`에 마운트하므로 초기 번들은 루틴 그대로다. 청크는 서비스워커 프리캐시 목록에 들어가지만(`dist/sw.js`), 오프라인 동작은 QA 가 SW 를 차단하므로 실기기에서 확인한다.
 
 - Iron 의 전역 CSS(`:root`/`body`/`button`/`input`…)는 빌드 시 `.iron-root` 아래로만 접두사 처리된다
   (`vite.config.js`의 postcss-prefix-selector). 루틴 화면의 토큰·버튼은 영향을 받지 않는다.

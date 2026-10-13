@@ -16,7 +16,7 @@
 ## 검증
 
 - `npm test`: 21 files / 220 tests 통과(루틴 102 + Iron 116 + 마운트 2). `npm run typecheck` 통과.
-- `npm run build`: mount 청크 265KB(gz 83KB) 분리, Iron CSS 19KB 전부 `.iron-root` 접두사(bare :root/body/button 0건).
+- `npm run build`: mount 청크 265KB(gz 83KB) 분리, Iron CSS 19KB 전부 `.iron-root` 접두사(bare :root/body/button 0건). 청크는 `dist/sw.js` 프리캐시 목록에 포함되나 오프라인 동작은 미검증(QA 는 SW 차단).
 - `node scripts/browser_qa.cjs`: 390/320/1200px 가로 넘침 0, 브라우저 오류 0, 헬스 탭 마운트·보조 메뉴 5개·하단 네비 없음·루틴 탭 폰트 비오염 확인.
   시드의 9월 고정 날짜가 달이 바뀌며 O 비율 50% 기대를 깨뜨려 이번 달 1일 기준으로 보정.
   화면: `/private/tmp/h2-routine-qa/iron-390.png`, `iron-320.png`, `iron-1200.png`.
