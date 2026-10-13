@@ -1,3 +1,33 @@
+# 헬스 탭 — Iron Terminal 통합 — 2026-10-13
+
+## 현재 작업
+
+사용자 요청: 기존 헬스 루틴(Iron Terminal, 맥미니 /iron/)을 루틴 앱의 하단 탭으로 합친다.
+승인 후 진행. 공개 저장소에 Iron 화면 코드가 올라가는 점은 사용자가 수락했다.
+
+- `src/iron/`(domain·storage·ui) 이식, `test/iron/` 116건. `test/iron-mount.dom.test.jsx` 2건 추가.
+- 하단 탭 `오늘 · 추이 · 헬스 · 설정`. 헬스 탭은 처음 열 때 `src/iron/mount.tsx` 동적 import → `#screen-iron`.
+- embedded 모드(`App embedded`): Iron 하단 네비·InstallPrompt·UpdateToast 대신 헤더 아래 `SubNav`.
+  `src/iron/ui/embedded.css` 에 셸 보정(sticky 묶음, 보조 메뉴, 좁은 폭 헤더 줄바꿈).
+- Iron CSS 는 `vite.config.js` 의 postcss-prefix-selector 로 `.iron-root` 아래로만 적용. `:root/html/body` → `.iron-root`.
+- `@vitejs/plugin-react` 6 은 babel 8 을 요구해 vite-plugin-pwa(babel 7)와 충돌 → 미사용. Vite 내장 JSX 변환으로 빌드·테스트 모두 정상(Fast Refresh 만 없음).
+- 저장 키 분리 유지. 기존 기록 이사는 사용자가 `/iron/` 설정 → JSON 내보내기 → 헬스 탭 설정 → 가져오기(README).
+
+## 검증
+
+- `npm test`: 21 files / 220 tests 통과(루틴 102 + Iron 116 + 마운트 2). `npm run typecheck` 통과.
+- `npm run build`: mount 청크 265KB(gz 83KB) 분리, Iron CSS 19KB 전부 `.iron-root` 접두사(bare :root/body/button 0건).
+- `node scripts/browser_qa.cjs`: 390/320/1200px 가로 넘침 0, 브라우저 오류 0, 헬스 탭 마운트·보조 메뉴 5개·하단 네비 없음·루틴 탭 폰트 비오염 확인.
+  시드의 9월 고정 날짜가 달이 바뀌며 O 비율 50% 기대를 깨뜨려 이번 달 1일 기준으로 보정.
+  화면: `/private/tmp/h2-routine-qa/iron-390.png`, `iron-320.png`, `iron-1200.png`.
+
+## 배포
+
+- 기능 소스 `b1092e8` 커밋, `npm run deploy` 로 `gh-pages` `142c00a` 배포(테스트·빌드 통과 후 push). 공개 URL 라이브 스모크(헬스 탭 포함)는 `node scripts/browser_qa.cjs --live-smoke` 로 확인.
+- 원본 `~/projects/iron-terminal/`·launchd `com.woogeun.ironterminal.serve`·컨트롤타워 `iron_terminal` 항목은 사용자가 폰에서 이사 확인한 뒤 정리.
+
+---
+
 # 하루 만족도 추이와 X 사유 아카이브 — 2026-09-17
 
 ## 현재 작업

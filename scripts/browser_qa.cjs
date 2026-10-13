@@ -52,10 +52,16 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.locator('#archiveSearch').count(), 1);
       assert.equal(await page.locator('.archive-export').textContent(), '전체 아카이브 내보내기');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await page.locator('[data-tab="iron"]').click();
+      await page.locator('#screen-iron.iron-root .iron-top .header').waitFor({ timeout: 15000 });
+      assert.equal(await page.locator('#screen-iron .iron-subnav .iron-subnav-item').count(), 5);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await page.screenshot({ path: path.join(report, 'production-iron-390.png'), fullPage: true });
+      await page.locator('[data-tab="trends"]').click();
       assert.deepEqual(errors, []);
       await page.screenshot({ path: path.join(report, 'production-trends-390.png'), fullPage: true });
       console.log(JSON.stringify({ production: true, status: response.status(), questionVisible: true,
-        choices: 2, trendsAndArchiveVisible: true, browserErrors: errors.length, screenshot: path.join(report, 'production-trends-390.png') }));
+        choices: 2, trendsAndArchiveVisible: true, ironTabMounted: true, browserErrors: errors.length, screenshot: path.join(report, 'production-trends-390.png') }));
       return;
     }
     await page.addInitScript(data => {
