@@ -322,9 +322,28 @@ document.getElementById('main').style.display = 'block';
 document.getElementById('tabbar').style.display = 'flex';
 render();
 save();
-var connectionCode = new URLSearchParams(location.hash.slice(1)).get('reminder');
-if (connectionCode) {
-  // 연결 코드는 히스토리·공유 URL에 남기지 않는다.
+var hashParams = new URLSearchParams(location.hash.slice(1));
+var connectionCode = hashParams.get('reminder');
+var ironTransfer = hashParams.get('iron-import');
+if (connectionCode || ironTransfer) {
+  // 연결 코드·이사 페이로드는 히스토리·공유 URL에 남기지 않는다.
   history.replaceState(null, '', location.pathname + location.search);
+}
+if (connectionCode) {
   reminders.connect(connectionCode).then(syncReflection).catch(function (error) { alert(error.message); });
 } else syncReflection();
+if (ironTransfer) {
+  /* 예전 Iron(/iron/) '새 앱으로 이동' — Safari 탭/데스크톱 경로. 홈 화면 PWA 는 저장소가 분리돼
+     여기로 못 오므로 그쪽은 설정의 '이사 코드 붙여넣기'를 쓴다. */
+  import('./iron/transfer-apply.ts').then(function (m) {
+    return m.applyTransferPayload(ironTransfer, {
+      confirmReplace: function (count, summary) {
+        return confirm('현재 헬스 세션 ' + count + '개를 가져온 기록(' + summary + ')으로 교체할까? 교체 전 자동 백업된다.');
+      }
+    });
+  }).then(function (result) {
+    if (result.ok) alert('헬스 기록 이사 완료 — ' + (result.summary || ''));
+    else if (!result.cancelled) alert('헬스 기록 이사 실패 — ' + (result.error || ''));
+    switchTab('iron');
+  }, function (e) { alert('헬스 기록 이사 실패 — ' + (e && e.message ? e.message : e)); });
+}

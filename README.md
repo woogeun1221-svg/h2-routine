@@ -21,7 +21,10 @@
   (`vite.config.js`의 postcss-prefix-selector). 루틴 화면의 토큰·버튼은 영향을 받지 않는다.
 - embedded 모드: Iron 의 하단 네비·설치 안내·SW 갱신 토스트는 끄고, 헤더 아래 보조 메뉴(홈/차트/기록/히스토리/캘린더)로 대체.
 - 저장 키는 Iron 그대로 `ironterminal:v1`. 루틴 기록 `h2-routine-v1`과 섞이지 않으며 백업도 각자 화면에서 한다.
-- **기존 기록 이사(한 번만)**: 예전 주소 `/iron/` → 설정 → JSON 내보내기, 새 `헬스` 탭 → 설정 → 가져오기. 형식이 같아 변환이 없다.
+- **기존 기록 이사(한 번만)**: 예전 주소 `/iron/` 맨 위 배너의 **이사 코드 복사** → 홈 화면 `H2 루틴` → 헬스 → 설정 → **이사 코드 붙여넣기** → 가져오기.
+  코드는 `IRONMOVE1.gz.…`(gzip+base64url, `src/iron/storage/transfer.ts`)이고 기기 밖으로 나가지 않는다. 현재 기록이 있으면 교체 전에 확인하고 자동 백업한다.
+  Safari 탭·데스크톱에서는 배너의 **새 앱으로 이동**이 `#iron-import=<코드>` 해시로 한 번에 넘긴다(iOS 홈 화면 PWA 는 Safari 와 저장소가 분리돼 이 경로가 닿지 않는다).
+  예전 방식(JSON 파일 내보내기/가져오기)도 그대로 된다.
 - 원본 `~/projects/iron-terminal/`과 launchd `com.woogeun.ironterminal.serve`는 이사 확인 전까지 유지한다.
 
 ## 개발

@@ -11,7 +11,10 @@
   `src/iron/ui/embedded.css` 에 셸 보정(sticky 묶음, 보조 메뉴, 좁은 폭 헤더 줄바꿈).
 - Iron CSS 는 `vite.config.js` 의 postcss-prefix-selector 로 `.iron-root` 아래로만 적용. `:root/html/body` → `.iron-root`.
 - `@vitejs/plugin-react` 6 은 babel 8 을 요구해 vite-plugin-pwa(babel 7)와 충돌 → 미사용. Vite 내장 JSX 변환으로 빌드·테스트 모두 정상(Fast Refresh 만 없음).
-- 저장 키 분리 유지. 기존 기록 이사는 사용자가 `/iron/` 설정 → JSON 내보내기 → 헬스 탭 설정 → 가져오기(README).
+- 저장 키 분리 유지. 기록 이사(2026-10-14 추가): `src/iron/storage/transfer.ts`(IRONMOVE1.gz/b64 코드, 양쪽 앱 동일 파일) + `src/iron/transfer-apply.ts`(스토어 적용·교체 전 preimport 백업).
+  새 앱: 설정 '예전 기록 이사' 카드(붙여넣기), 대시보드 빈 상태 '예전 기록 이사' 버튼, `main.js` 의 `#iron-import=` 해시 처리.
+  예전 앱(`~/projects/iron-terminal`, 루트 repo): `MigrateBanner`(이사 코드 복사 / 새 앱으로 이동) — `npm run build` 로 dist 갱신, launchd 정적 서버가 즉시 서빙(재시작 불필요). 테스트 120건.
+  iOS 홈 화면 PWA 는 Safari 와 저장소가 분리돼 URL 경로가 닿지 않는다 → 클립보드 경로가 기본.
 
 ## 검증
 

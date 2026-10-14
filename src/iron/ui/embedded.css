@@ -26,3 +26,9 @@
 .day-chip { white-space: nowrap; }
 .iron-subnav { gap: 5px; padding: 8px 12px; }
 .iron-subnav-item { flex: 0 0 auto; gap: 5px; padding: 0 9px; font-size: 11.5px; }
+
+/* 예전 기록 이사 코드 입력 */
+.iron-transfer-code {
+  width: 100%; padding: 8px; font: 11.5px/1.4 var(--font-mono); color: var(--text);
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-sm); word-break: break-all;
+}

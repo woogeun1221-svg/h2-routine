@@ -35,6 +35,7 @@ import { HistoryScreen } from "./screens/HistoryScreen.js";
 import { CalendarScreen } from "./screens/CalendarScreen.js";
 import { SettingsScreen } from "./screens/SettingsScreen.js";
 import { ROUTE_LABELS } from "./app/routes.js";
+import { applyTransferPayload } from "../transfer-apply.js";
 
 /** App props. embedded=true 면 루틴 앱의 '헬스' 탭 안(호스트 탭바·PWA 존재)에서 동작한다. */
 export interface AppProps {
@@ -91,6 +92,16 @@ export function App({ embedded = false }: AppProps = {}): React.ReactElement {
   }, []);
 
   const openSettings = useCallback(() => navigate("settings"), [navigate]);
+
+  // 예전 Iron 의 이사 코드 → 현재 기록이 있으면 교체 전에 확인.
+  const importTransfer = useCallback(
+    (payload: string) =>
+      applyTransferPayload(payload, {
+        confirmReplace: (count, summary) =>
+          window.confirm(`현재 세션 ${count}개를 가져온 기록(${summary})으로 교체할까요? 교체 전 자동 백업됩니다.`),
+      }),
+    [],
+  );
 
   const headerBar = (
     <Header
@@ -165,6 +176,7 @@ export function App({ embedded = false }: AppProps = {}): React.ReactElement {
         <SettingsScreen
           store={root}
           importData={importData}
+          importTransfer={embedded ? importTransfer : undefined}
           updateWeightState={updateWeightState}
           updateSettings={updateSettings}
           resetData={resetData}

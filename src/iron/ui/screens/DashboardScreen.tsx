@@ -153,12 +153,17 @@ export function DashboardScreen({
           title="첫 기록을 남겨보세요"
           sub="여기가 당신의 시작 무게입니다. 첫 세션을 기록하면 추세·기록이 쌓입니다."
           action={
-            <button
-              className="btn primary"
-              onClick={() => navigate("input")}
-            >
-              <Play size={16} strokeWidth={2.5} /> 첫 기록 시작
-            </button>
+            <div className="row wrap" style={{ gap: 10, justifyContent: "center" }}>
+              <button
+                className="btn primary"
+                onClick={() => navigate("input")}
+              >
+                <Play size={16} strokeWidth={2.5} /> 첫 기록 시작
+              </button>
+              <button className="btn" onClick={() => navigate("settings")}>
+                예전 기록 이사
+              </button>
+            </div>
           }
         />
       </div>

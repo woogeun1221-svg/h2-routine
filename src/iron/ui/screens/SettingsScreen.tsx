@@ -31,6 +31,8 @@ export interface SettingsScreenProps {
   store: RootStore;
   /** JSON 가져오기(replace 시 현재 데이터 자동 백업). 결과를 반환. */
   importData: (text: string, mode: ImportMode) => ImportResult;
+  /** 예전 Iron(/iron/)에서 복사한 이사 코드 적용. embedded(루틴 앱) 에서만 주입. */
+  importTransfer?: (payload: string) => Promise<{ ok: boolean; summary?: string; error?: string }>;
   /** 종목별 목표 무게 상태 수동 갱신. */
   updateWeightState: (
     exerciseId: ExerciseId,
@@ -94,11 +96,29 @@ function currentTarget(
 export function SettingsScreen({
   store,
   importData,
+  importTransfer,
   updateWeightState,
   updateSettings,
   resetData,
 }: SettingsScreenProps): React.ReactElement {
   const [flash, setFlash] = useState<FlashMsg | null>(null);
+  const [transferCode, setTransferCode] = useState("");
+  const [transferBusy, setTransferBusy] = useState(false);
+  async function runTransfer(): Promise<void> {
+    if (!importTransfer) return;
+    setTransferBusy(true);
+    try {
+      const result = await importTransfer(transferCode);
+      if (result.ok) {
+        setTransferCode("");
+        setFlash({ kind: "ok", text: "이사 완료 — " + (result.summary ?? "") });
+      } else {
+        setFlash({ kind: "error", text: result.error ?? "이사 실패" });
+      }
+    } finally {
+      setTransferBusy(false);
+    }
+  }
   const [pendingImport, setPendingImport] = useState<{
     text: string;
     fileName: string;
@@ -209,6 +229,34 @@ export function SettingsScreen({
         >
           {flash.text}
         </div>
+      )}
+
+      {/* ── 예전 Iron 기록 이사 (루틴 앱 안에서만) ── */}
+      {importTransfer && (
+        <Card title="예전 기록 이사" accessory={<span className="dim">iron/ → 헬스</span>}>
+          <p className="dim" style={{ fontSize: 13, marginBottom: 10 }}>
+            예전 Iron 화면의 <strong style={{ color: "var(--text)" }}>이사 코드 복사</strong>를 누른 뒤
+            여기 붙여넣으면 기록이 그대로 들어옵니다. 현재 기록이 있으면 교체 전에 확인합니다.
+          </p>
+          <textarea
+            className="iron-transfer-code"
+            value={transferCode}
+            onChange={(e) => setTransferCode(e.target.value)}
+            placeholder="IRONMOVE1.gz.…"
+            rows={4}
+            spellCheck={false}
+          />
+          <div className="row wrap" style={{ gap: 10, marginTop: 10 }}>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={!transferCode.trim() || transferBusy}
+              onClick={() => void runTransfer()}
+            >
+              이사 코드 가져오기
+            </button>
+          </div>
+        </Card>
       )}
 
       {/* ── 백업 · 이전 ── */}
