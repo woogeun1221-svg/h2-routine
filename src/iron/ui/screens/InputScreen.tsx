@@ -36,6 +36,7 @@ import { suggestedWeight } from "../../domain/progression.js";
 import { sessionVolume } from "../../domain/volume.js";
 import { prsInSession } from "../../domain/pr.js";
 import { todayLocal } from "../../domain/dateUtil.js";
+import { MAX_SETS, MIN_SETS, appendSet, initialSetCount, removeSetAt } from "../../domain/sets.js";
 import { useProgram } from "../app/useProgram.js";
 import { store } from "../useStore.js";
 import { fmtKg, fmtReps, fmtVolume } from "../format/num.js";
@@ -108,7 +109,7 @@ function buildExerciseDraft(
   const lastLog = findLastLog(def.id, allSessions);
 
   const planned = bodyweight ? null : suggestion.suggestedKg;
-  const setCount = Math.max(def.setCount, lastLog?.sets.length ?? 0);
+  const setCount = initialSetCount(def, lastLog);
 
   const sets: SetDraft[] = [];
   for (let i = 0; i < setCount; i++) {
@@ -170,12 +171,15 @@ function SetRow({
   def,
   bodyweight,
   onChange,
+  onRemove,
 }: {
   index: number;
   draft: SetDraft;
   def: ExerciseDef;
   bodyweight: boolean;
   onChange: (next: SetDraft) => void;
+  /** 세트 삭제(하한이면 undefined → 버튼 생략). */
+  onRemove?: () => void;
 }): React.ReactElement {
   const hit = draft.reps >= def.targetReps;
   return (
@@ -202,11 +206,23 @@ function SetRow({
         onChange={(next) => onChange({ ...draft, reps: next })}
       />
 
-      {hit && (
-        <span className="set-row-badge">
-          <Badge variant="up">달성</Badge>
-        </span>
-      )}
+      <span className="set-row-end">
+        {hit && (
+          <span className="set-row-badge">
+            <Badge variant="up">달성</Badge>
+          </span>
+        )}
+        {onRemove && (
+          <button
+            type="button"
+            className="set-remove"
+            aria-label={`${def.name} ${index + 1}세트 삭제`}
+            onClick={onRemove}
+          >
+            ×
+          </button>
+        )}
+      </span>
     </div>
   );
 }
@@ -268,7 +284,7 @@ function ExerciseCard({
       title={def.name}
       accessory={
         <span className="dim">
-          {def.setCount}세트 · 목표 {fmtReps(def.targetReps, true)}
+          {sets.length}세트 · 목표 {fmtReps(def.targetReps, true)}
           {!bodyweight && base != null && (
             <> · 제안 <span className="num">{fmtKg(base)}</span>kg</>
           )}
@@ -286,9 +302,31 @@ function ExerciseCard({
             onChange={(next) =>
               onSetsChange(sets.map((cur, j) => (j === i ? next : cur)))
             }
+            onRemove={
+              sets.length > MIN_SETS
+                ? () => onSetsChange(removeSetAt(sets, i))
+                : undefined
+            }
           />
         ))}
       </div>
+
+      {/* 그날그날 세트 수 조정 — 새 세트는 마지막 세트의 무게·횟수를 이어받는다. */}
+      <button
+        type="button"
+        className="btn ghost full set-add"
+        disabled={sets.length >= MAX_SETS}
+        onClick={() =>
+          onSetsChange(
+            appendSet(sets, (last) => ({
+              weightKg: bodyweight ? null : (last?.weightKg ?? draft.plannedWeightKg),
+              reps: last?.reps ?? def.targetReps,
+            })),
+          )
+        }
+      >
+        ＋ 세트 추가
+      </button>
 
       {!bodyweight && firstWeight !== null && sets.length > 1 && (
         <button type="button" className="btn ghost full quickfill" onClick={applyToAll}>

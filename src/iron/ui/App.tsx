@@ -15,7 +15,8 @@
  */
 
 import { useCallback, useMemo } from "react";
-import type { AppSettings } from "../domain/types.js";
+import type { AppSettings, ExerciseId } from "../domain/types.js";
+import { clampSetCount } from "../domain/sets.js";
 import { initialStore } from "../domain/presets.js";
 import { nextWorkout } from "../domain/rotation.js";
 import { computeWeeklyStreak } from "../domain/streak.js";
@@ -78,6 +79,18 @@ export function App({ embedded = false }: AppProps = {}): React.ReactElement {
       ...prev,
       settings: { ...prev.settings, ...patch },
     }));
+  }, []);
+
+  // 종목 기본 세트 수(기록 화면 초기값) 갱신.
+  const updateSetCount = useCallback((exerciseId: ExerciseId, setCount: number) => {
+    store.setState((prev) => {
+      const def = prev.exercises[exerciseId];
+      if (!def) return prev;
+      return {
+        ...prev,
+        exercises: { ...prev.exercises, [exerciseId]: { ...def, setCount: clampSetCount(setCount) } },
+      };
+    });
   }, []);
 
   const resetData = useCallback(() => {
@@ -179,6 +192,7 @@ export function App({ embedded = false }: AppProps = {}): React.ReactElement {
           importTransfer={embedded ? importTransfer : undefined}
           updateWeightState={updateWeightState}
           updateSettings={updateSettings}
+          updateSetCount={updateSetCount}
           resetData={resetData}
         />
       );

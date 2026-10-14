@@ -16,9 +16,11 @@
   예전 앱(`~/projects/iron-terminal`, 루트 repo): `MigrateBanner`(이사 코드 복사 / 새 앱으로 이동) — `npm run build` 로 dist 갱신, launchd 정적 서버가 즉시 서빙(재시작 불필요). 테스트 120건.
   iOS 홈 화면 PWA 는 Safari 와 저장소가 분리돼 URL 경로가 닿지 않는다 → 클립보드 경로가 기본.
 
+- 세트 수 조정(2026-10-14): `src/iron/domain/sets.ts`(initialSetCount·appendSet·removeSetAt·clamp 1~12). 기록 화면 종목 카드에 ＋ 세트 추가 / × 삭제, 카드 머리 세트 수 실시간. 다음 기록은 마지막에 한 세트 수로 시작(기존은 max(기본, 지난)로 늘어나기만 했음). 설정 '기본 세트 수' 카드 + `App.updateSetCount`. 대시보드 '예전 기록 이사' 버튼 제거(사용자가 이사 불필요 확정). 예전 /iron/ launchd 서비스 bootout+disable, 컨트롤타워 iron_terminal 항목 제거.
+
 ## 검증
 
-- `npm test`: 21 files / 220 tests 통과(루틴 102 + Iron 116 + 마운트 2). `npm run typecheck` 통과.
+- `npm test`: 24 files / 230 tests 통과(루틴 102 + Iron 120 + 세트 4 + 마운트·이사 4). `npm run typecheck` 통과.
 - `npm run build`: mount 청크 265KB(gz 83KB) 분리, Iron CSS 19KB 전부 `.iron-root` 접두사(bare :root/body/button 0건). 청크는 `dist/sw.js` 프리캐시 목록에 포함되나 오프라인 동작은 미검증(QA 는 SW 차단).
 - `node scripts/browser_qa.cjs`: 390/320/1200px 가로 넘침 0, 브라우저 오류 0, 헬스 탭 마운트·보조 메뉴 5개·하단 네비 없음·루틴 탭 폰트 비오염 확인.
   시드의 9월 고정 날짜가 달이 바뀌며 O 비율 50% 기대를 깨뜨려 이번 달 1일 기준으로 보정.

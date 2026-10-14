@@ -154,8 +154,18 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.locator('#screen-iron .iron-subnav .iron-subnav-item').count(), 5);
     assert.equal(await page.locator('#screen-iron .bottomnav').count(), 0);
     assert((await page.locator('#screen-iron .header').innerText()).includes('상체'));
+    assert.equal(await page.locator('#screen-iron').getByRole('button', { name: '예전 기록 이사' }).count(), 0);
     await page.locator('#screen-iron .iron-subnav-item.is-input').click();
     assert.equal(await page.locator('#screen-iron .iron-subnav-item.is-input').getAttribute('aria-selected'), 'true');
+    // 세트 수 조정: 기본 4세트 → 추가 5 → 삭제 4. 카드 머리의 세트 수도 따라간다.
+    const firstCard = page.locator('#screen-iron .input-screen .card').first();
+    await firstCard.locator('.set-row').first().waitFor();   // 드래프트는 effect 뒤에 그려진다
+    assert.equal(await firstCard.locator('.set-row').count(), 4);
+    await firstCard.getByRole('button', { name: '세트 추가' }).click();
+    assert.equal(await firstCard.locator('.set-row').count(), 5);
+    assert((await firstCard.locator('.card-sub').innerText()).includes('5세트'));
+    await firstCard.locator('.set-remove').last().click();
+    assert.equal(await firstCard.locator('.set-row').count(), 4);
     await page.locator('#screen-iron .iron-subnav-item').first().click();
     assert.equal(await page.locator('.tabbar .tab').first().evaluate(el => getComputedStyle(el).fontFamily), routineTabFont);
     assert.equal(await page.evaluate(() => getComputedStyle(document.body).fontFamily.includes('IBM Plex Sans KR')), true);

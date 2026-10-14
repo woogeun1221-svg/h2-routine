@@ -22,6 +22,7 @@ import type {
 } from "../../domain/types.js";
 import type { ImportMode, ImportResult } from "../../storage/exchange.js";
 import { exportJson } from "../../storage/exchange.js";
+import { MAX_SETS, MIN_SETS } from "../../domain/sets.js";
 import { Card } from "../components/Card.js";
 import { fmtKg } from "../format/num.js";
 
@@ -40,6 +41,8 @@ export interface SettingsScreenProps {
   ) => void;
   /** 앱 설정 부분 갱신(예: weeklyGoal). */
   updateSettings: (patch: Partial<AppSettings>) => void;
+  /** 종목 기본 세트 수 갱신(기록 화면 초기 세트 수). */
+  updateSetCount: (exerciseId: ExerciseId, setCount: number) => void;
   /** 전체 데이터 초기화(프리셋 상태로 대체). */
   resetData: () => void;
 }
@@ -99,6 +102,7 @@ export function SettingsScreen({
   importTransfer,
   updateWeightState,
   updateSettings,
+  updateSetCount,
   resetData,
 }: SettingsScreenProps): React.ReactElement {
   const [flash, setFlash] = useState<FlashMsg | null>(null);
@@ -127,6 +131,7 @@ export function SettingsScreen({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const exercises = useMemo(() => editableExercises(store), [store]);
+  const allExercises = useMemo(() => Object.values(store.exercises), [store.exercises]);
 
   // ── 내보내기 ──
   function handleExport(): void {
@@ -203,6 +208,16 @@ export function SettingsScreen({
     }
     updateSettings({ weeklyGoal: parsed });
     setFlash({ kind: "ok", text: `주간 목표를 ${parsed}회로 설정했습니다.` });
+  }
+
+  function handleSetCountChange(def: ExerciseDef, raw: string): void {
+    const parsed = Math.round(Number(raw));
+    if (!Number.isFinite(parsed) || parsed < MIN_SETS || parsed > MAX_SETS) {
+      setFlash({ kind: "error", text: `세트 수는 ${MIN_SETS}~${MAX_SETS} 사이여야 합니다.` });
+      return;
+    }
+    updateSetCount(def.id, parsed);
+    setFlash({ kind: "ok", text: `${def.name} 기본 세트 수를 ${parsed}세트로 설정했습니다.` });
   }
 
   // ── 초기화 ──
@@ -383,6 +398,38 @@ export function SettingsScreen({
           {exercises.length === 0 && (
             <span className="dim">조정할 가중 종목이 없습니다.</span>
           )}
+        </div>
+      </Card>
+
+      {/* ── 기본 세트 수 ── */}
+      <Card title="기본 세트 수">
+        <p className="dim" style={{ fontSize: 13, marginBottom: 12 }}>
+          기록 화면에 처음 뜨는 세트 수입니다. 기록 중에는 ＋ 세트 추가 / × 로 그날그날 바꿀 수 있고,
+          다음 기록은 마지막에 실제로 한 세트 수로 시작합니다.
+        </p>
+        <div className="col" style={{ gap: 12 }}>
+          {allExercises.map((def) => (
+            <div key={def.id} className="row between" style={{ gap: 12 }}>
+              <span style={{ fontWeight: 700 }}>{def.name}</span>
+              <div className="row" style={{ gap: 6, flex: "0 0 auto" }}>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  className="input num"
+                  style={{ width: 72 }}
+                  defaultValue={def.setCount}
+                  min={MIN_SETS}
+                  max={MAX_SETS}
+                  step={1}
+                  aria-label={`${def.name} 기본 세트 수`}
+                  onBlur={(e) => handleSetCountChange(def, e.target.value)}
+                />
+                <span className="dim" style={{ fontSize: 13 }}>
+                  세트
+                </span>
+              </div>
+            </div>
+          ))}
         </div>
       </Card>
 

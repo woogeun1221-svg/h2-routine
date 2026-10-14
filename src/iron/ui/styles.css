@@ -1191,3 +1191,28 @@ select.input {
     font-size: 24px;
   }
 }
+
+/* ── 세트 수 조정(2026-10-14): 행 오른쪽 묶음(달성 배지 + 삭제), 카드 하단 추가 버튼 ── */
+.set-row-end {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.set-row-end .set-row-badge { margin-left: 0; }
+.set-remove {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--text-dim);
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.set-remove:active { color: var(--up); border-color: var(--up-line); }
+.set-add { margin-bottom: 10px; }
