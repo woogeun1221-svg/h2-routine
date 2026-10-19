@@ -1,9 +1,12 @@
 /* v1(h2-routine-tracker.html)의 일간 상태 로직을 유지하고 주간 검토를 확장.
    모든 함수가 (state, today)를 인자로 받는 순수 함수. */
 
+/* startKey가 있는 습관은 state[startKey](기능 활성일)부터만 판정에 들어간다 — 투자 원칙과 같은
+   규칙으로, 추가 전 날짜를 소급해 미달로 바꾸지 않는다. 활성일이 없는 상태에선 없는 습관으로 본다. */
 export const HABITS = [
   { key: 'p', name: '푸쉬업', unit: '회', target: 100, min: 30, steps: [10, 25, 50] },
   { key: 's', name: '스쿼트', unit: '회', target: 100, min: 30, steps: [10, 25, 50] },
+  { key: 't', name: '턱걸이', unit: '회', target: 20,  min: 5,  steps: [5, 10, 20], startKey: 'pullupStart' },
   { key: 'r', name: '독서',   unit: '분', target: 20,  min: 5,  steps: [5, 10, 20] }
 ];
 
@@ -13,14 +16,23 @@ export const INVESTMENT_REVIEW = {
 };
 
 /* 유효 목표치 — state.settings의 오버라이드를 HABITS 기본값 위에 적용.
-   settings가 없거나 값이 이상하면 기본값 (v1 데이터 호환). */
-export function goalsOf(state) {
-  return HABITS.map(function (h) {
+   settings가 없거나 값이 이상하면 기본값 (v1 데이터 호환).
+   ds를 주면 그날 판정에 들어가는 습관만, 없으면(설정 화면) 활성화된 습관 전부. */
+export function goalsOf(state, ds) {
+  return HABITS.filter(function (h) {
+    if (!h.startKey) return true;
+    var since = state[h.startKey];
+    if (typeof since !== 'string') return false;
+    return ds === undefined || ds >= since;
+  }).map(function (h) {
     var o = (state.settings && state.settings[h.key]) || {};
     var target = (typeof o.target === 'number' && o.target >= 1) ? o.target : h.target;
     var min = (typeof o.min === 'number' && o.min >= 1) ? o.min : h.min;
     if (min > target) min = target; // 어떤 조합이 와도 최소 ≤ 정상 보장
-    return { key: h.key, name: h.name, unit: h.unit, steps: h.steps, target: target, min: min };
+    return {
+      key: h.key, name: h.name, unit: h.unit, steps: h.steps, target: target, min: min,
+      since: h.startKey ? state[h.startKey] : null
+    };
   });
 }
 
@@ -87,10 +99,10 @@ export function investmentReviewStatus(state, ds) {
 }
 
 /* ---------- status logic ---------- */
-export function getDay(state, ds) { return state.days[ds] || { p: 0, s: 0, r: 0, w: null, i: false }; }
+export function getDay(state, ds) { return state.days[ds] || { p: 0, s: 0, t: 0, r: 0, w: null, i: false }; }
 
 export function statusOf(state, ds) {
-  var d = getDay(state, ds), goals = goalsOf(state), full = true, min = true;
+  var d = getDay(state, ds), goals = goalsOf(state, ds), full = true, min = true;
   for (var i = 0; i < goals.length; i++) {
     var h = goals[i], v = d[h.key] || 0;
     if (v < h.target) full = false;
@@ -105,7 +117,7 @@ export function statusOf(state, ds) {
 }
 
 export function completion(state, ds) {
-  var d = getDay(state, ds), goals = goalsOf(state), sum = 0;
+  var d = getDay(state, ds), goals = goalsOf(state, ds), sum = 0;
   for (var i = 0; i < goals.length; i++) {
     var h = goals[i]; sum += Math.min(1, (d[h.key] || 0) / h.target);
   }
@@ -247,6 +259,7 @@ function investmentReviewMonthStats(state, ym, today) {
 
 /* 습관별 월간 통계 — 해당 월 안에서 startDate부터 어제까지(확정분만).
    일간 습관은 자기 목표 기준 정상/최소/미달 일수, 누적 합, 달성률.
+   나중에 추가한 습관(since)은 활성일부터만 세고 days(자기 표본 일수)로 비율을 낸다.
    투자 원칙은 위 주간 기준, 송은은 o/x/na 일수. total=0이면 일간 표본 없음. */
 export function habitMonthStats(state, ym, today) {
   var monthStart = ym + '-01';
@@ -256,7 +269,7 @@ export function habitMonthStats(state, ym, today) {
   var to = monthEnd < yest ? monthEnd : yest;
   var goals = goalsOf(state);
   var habits = goals.map(function (h) {
-    return { key: h.key, name: h.name, unit: h.unit, full: 0, min: 0, miss: 0, sum: 0 };
+    return { key: h.key, name: h.name, unit: h.unit, days: 0, full: 0, min: 0, miss: 0, sum: 0 };
   });
   var w = { o: 0, x: 0, na: 0 }, total = 0, cur = from;
   while (cur <= to) {
@@ -264,7 +277,8 @@ export function habitMonthStats(state, ym, today) {
     var d = getDay(state, cur);
     for (var i = 0; i < goals.length; i++) {
       var h = goals[i], hs = habits[i], v = d[h.key] || 0;
-      hs.sum += v;
+      if (h.since && cur < h.since) continue; // 추가 전 날짜는 그 습관의 표본이 아니다
+      hs.days++; hs.sum += v;
       if (v >= h.target) hs.full++;
       else if (v >= h.min) hs.min++;
       else hs.miss++;
@@ -273,8 +287,9 @@ export function habitMonthStats(state, ym, today) {
     cur = shift(cur, 1);
   }
   for (var j = 0; j < habits.length; j++) {
-    habits[j].fullRate = total ? Math.round(habits[j].full / total * 100) : null;
-    habits[j].minRate = total ? Math.round((habits[j].full + habits[j].min) / total * 100) : null;
+    var n = habits[j].days;
+    habits[j].fullRate = n ? Math.round(habits[j].full / n * 100) : null;
+    habits[j].minRate = n ? Math.round((habits[j].full + habits[j].min) / n * 100) : null;
   }
   return { total: total, habits: habits, investment: investmentReviewMonthStats(state, ym, today), w: w };
 }

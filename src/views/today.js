@@ -20,8 +20,8 @@ export function renderToday(state, t, h) {
   var show = (y >= state.startDate) && statusOf(state, y) === 'miss';
   document.getElementById('banner').className = 'banner' + (show ? ' show' : '');
 
-  /* 배너·룰 노트의 목표 숫자는 설정을 따라간다 */
-  var goals = goalsOf(state);
+  /* 배너·룰 노트의 목표 숫자는 설정을 따라간다 (오늘 판정에 들어가는 습관만) */
+  var goals = goalsOf(state, t);
   document.getElementById('bannerMins').textContent = goals.map(function (g) { return g.min; }).join('·');
   document.getElementById('goalFullNums').textContent = goals.map(function (g) { return g.target; }).join(' · ');
   document.getElementById('goalMinNums').textContent = goals.map(function (g) { return g.min; }).join(' · ');
@@ -34,7 +34,7 @@ function renderCards(state, t, h) {
   var d = getDay(state, t), wrap = document.getElementById('cards');
   wrap.innerHTML = '';
 
-  goalsOf(state).forEach(function (hb) {
+  goalsOf(state, t).forEach(function (hb) {
     var v = d[hb.key] || 0;
     var tier = v >= hb.target ? 'full' : (v >= hb.min ? 'min' : '');
     var card = document.createElement('div'); card.className = 'card';
@@ -73,7 +73,7 @@ function renderCards(state, t, h) {
     });
     var ub = document.createElement('button'); ub.className = 'btn undo';
     ub.textContent = '↺'; ub.title = '마지막 추가 취소';
-    ub.disabled = h.undoStack[hb.key].length === 0;
+    ub.disabled = (h.undoStack[hb.key] || []).length === 0;
     ub.addEventListener('click', function () { h.undoVal(hb.key); });
     btns.appendChild(ub);
 

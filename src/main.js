@@ -7,7 +7,7 @@ import '@fontsource/ibm-plex-mono/600.css';
 import '@fontsource/ibm-plex-mono/700.css';
 import './styles.css';
 import { registerSW } from 'virtual:pwa-register';
-import { todayStr, getDay, shift, monthList, shiftMonth, investmentReviewStatus } from './logic.js';
+import { HABITS, todayStr, getDay, shift, monthList, shiftMonth, investmentReviewStatus } from './logic.js';
 import { load, save as persist, exportText, importText, freshState } from './storage.js';
 import { renderToday } from './views/today.js';
 import { renderTrends } from './views/trends.js';
@@ -24,7 +24,12 @@ registerSW({
 });
 
 var state = load(todayStr());
-var undoStack = { p: [], s: [], r: [] };
+function emptyUndo() {
+  var u = {};
+  HABITS.forEach(function (h) { u[h.key] = []; });
+  return u;
+}
+var undoStack = emptyUndo();
 var renderedDate = null;
 var activeTab = 'today';       // 'today' | 'trends' | 'iron' | 'settings'
 var trendYm = null;            // 추이 화면에서 보고 있는 달 — 진입 시 이번 달로 리셋
@@ -66,7 +71,7 @@ function save() {
 
 /* ---------- mutations (v1과 동일하게 항상 '지금'의 오늘 날짜에 기록) ---------- */
 function ensureDay(t) {
-  if (!state.days[t]) state.days[t] = { p: 0, s: 0, r: 0, w: null };
+  if (!state.days[t]) state.days[t] = { p: 0, s: 0, t: 0, r: 0, w: null };
   return state.days[t];
 }
 function addVal(key, step) {
@@ -123,7 +128,9 @@ function setGoal(key, target, min) {
 }
 function resetGoals() {
   if (!state.settings) return;
-  if (!confirm('목표치를 기본값(100·100·20 / 30·30·5)으로 되돌릴까?')) return;
+  var targets = HABITS.map(function (h) { return h.target; }).join(', ');
+  var mins = HABITS.map(function (h) { return h.min; }).join(', ');
+  if (!confirm('목표치를 기본값(정상 ' + targets + ' / 최소 ' + mins + ')으로 되돌릴까?')) return;
   delete state.settings;
   save(); render();
 }
@@ -249,7 +256,7 @@ function applyImport(text) {
   var existing = Object.keys(state.days).length;
   if (existing > 0 && !confirm('현재 기록 ' + existing + '일치를 가져온 데이터로 교체할까?')) return;
   state = incoming;
-  undoStack = { p: [], s: [], r: [] };
+  undoStack = emptyUndo();
   save(); render();
   syncReflection();
   alert('가져오기 완료 — ' + Object.keys(state.days).length + '일치 기록, 시작일 ' + state.startDate);
@@ -275,7 +282,7 @@ document.getElementById('goalRestoreBtn').addEventListener('click', resetGoals);
 document.getElementById('resetBtn').addEventListener('click', function () {
   if (!confirm('모든 기록을 삭제할까? 되돌릴 수 없어.')) return;
   state = freshState(todayStr());
-  undoStack = { p: [], s: [], r: [] };
+  undoStack = emptyUndo();
   try { persist(state); } catch (e) {}
   render();
   syncReflection();
@@ -299,7 +306,7 @@ document.addEventListener('visibilitychange', function () {
   if (document.visibilityState !== 'visible') return;
   if (swRegistration) swRegistration.update().catch(function () {});
   if (renderedDate && renderedDate !== todayStr()) {
-    undoStack = { p: [], s: [], r: [] };
+    undoStack = emptyUndo();
     if (activeTab === 'trends') trendYm = todayStr().slice(0, 7);
     render();
   }
@@ -309,7 +316,7 @@ window.addEventListener('online', syncReflection);
 setInterval(function () {
   if (document.visibilityState !== 'visible') return;
   if (renderedDate !== todayStr()) {
-    undoStack = { p: [], s: [], r: [] };
+    undoStack = emptyUndo();
     if (activeTab === 'trends') trendYm = todayStr().slice(0, 7);
     render();
   }

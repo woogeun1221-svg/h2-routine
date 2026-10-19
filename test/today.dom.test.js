@@ -37,6 +37,22 @@ describe('renderToday DOM 스모크', () => {
     expect(document.getElementById('streak').textContent).toBe('1일');
   });
 
+  it('턱걸이 활성일부터 카드 6개, 활성 전날 기록은 소급 미달 없음', () => {
+    const state = {
+      startDate: '2026-07-01', investmentReviewStart: '2026-07-22', pullupStart: '2026-07-22',
+      days: { '2026-07-21': FULL, '2026-07-22': { ...FULL, t: 5 } }
+    };
+    renderToday(state, '2026-07-22', handlers); // undoStack에 t가 없어도 렌더
+    const cards = document.querySelectorAll('#cards .card');
+    expect(cards.length).toBe(6);
+    expect(cards[2].querySelector('.card-name').textContent).toContain('턱걸이');
+    expect(cards[2].querySelector('.done-flag').textContent).toBe('최소');
+    expect(document.getElementById('goalFullNums').textContent).toBe('100 · 100 · 20 · 20');
+    expect(document.getElementById('bannerMins').textContent).toBe('30·30·5·5');
+    expect(document.getElementById('banner').className).not.toContain('show'); // 어제는 세 습관 기준 정상
+    expect(document.getElementById('streak').textContent).toBe('2일');
+  });
+
   it('어제 미달이면 배너 표시, 아니면 숨김', () => {
     const state = { startDate: '2026-07-01', days: {} };
     renderToday(state, '2026-07-22', handlers);

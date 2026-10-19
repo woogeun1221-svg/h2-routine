@@ -12,11 +12,12 @@ const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format
 const oldRecord = { p: 100, s: 30, r: 20, w: 'o', i: true, self: 'x', selfReason: '오래된 사유도 아카이브에 남는다.' };
 // 선택 월 O 비율 50% 기대: 이번 달 1일 O + 오늘 X. 9월 고정 날짜는 달이 바뀌면 0%가 돼 깨졌다(2026-10-13).
 const firstOfMonth = date.slice(0, 8) + '01';
-const seed = { startDate: '2026-08-19', investmentReviewStart: '2026-08-19',
+// pullupStart=오늘: 턱걸이(2026-10-19 추가)는 활성일부터만 판정 — 옛 기록은 세 습관 기준 그대로.
+const seed = { startDate: '2026-08-19', investmentReviewStart: '2026-08-19', pullupStart: date,
   days: { '2026-08-19': oldRecord,
     '2026-08-20': { self: 'o', selfReason: 'O로 바꾼 뒤에도 남겨둔 사유' },
     ...(firstOfMonth === date ? {} : { [firstOfMonth]: { self: 'o' } }),
-    [date]: { p: 30, s: 30, r: 5, w: null } } };
+    [date]: { p: 30, s: 30, t: 5, r: 5, w: null } } };
 const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
   '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml',
   '.png': 'image/png', '.woff': 'font/woff', '.woff2': 'font/woff2' };
@@ -177,7 +178,8 @@ const server = http.createServer((req, res) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.locator('[data-tab="today"]').click();
     assert.equal(await page.locator('#screen-iron').isVisible(), false);
-    assert.equal(await page.locator('#cards .card').count(), 5);
+    assert.equal(await page.locator('#cards .card').count(), 6); // 일간 4 + 송은 + 투자 원칙
+    assert((await page.locator('#cards .card').nth(2).innerText()).includes('턱걸이'));
 
     await page.locator('[data-tab="trends"]').click();
     for (const width of [390, 320, 1200]) {

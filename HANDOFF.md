@@ -1,3 +1,36 @@
+# 턱걸이 20회 추가 — 2026-10-19
+
+## 현재 작업
+
+사용자 요청: 루틴에 턱걸이 20회를 추가한다. 코드 수정과 로컬 검증까지 진행, 커밋과 배포는 승인 대기.
+
+- `src/logic.js` HABITS에 `t` 턱걸이(정상 20회, 최소 5회, +5/+10/+20). 푸쉬업, 스쿼트 다음, 독서 앞. `startKey: 'pullupStart'`.
+- 소급 금지: 투자 원칙(`investmentReviewStart`)과 같은 활성일 규칙. `goalsOf(state, ds)`가 활성일 전 날짜에선 턱걸이를 빼므로
+  기존 스트릭, 정상률, 장부, 히트맵, 어제 미달 배너가 바뀌지 않는다. 활성일 필드가 없는 상태(옛 테스트 픽스처)에선 없는 습관으로 본다.
+  설정 화면은 `goalsOf(state)`(날짜 없음)로 활성화된 습관 전부를 보여 준다.
+- `src/storage.js`: `START_KEYS`(investmentReviewStart, pullupStart)를 load/import 때 없으면 오늘로 채운다(`activateFeatures`). `freshState`도 포함.
+  검증은 날짜 형식, `t` 0 이상 숫자, settings 허용 키를 HABITS에서 파생(이전엔 p/s/r 하드코딩이라 `settings.t` 저장 후 다음 로드에서 fresh로 떨어질 뻔했다).
+- `src/main.js`: undoStack을 HABITS에서 생성(`emptyUndo`, 5곳), 새 날 기본 기록 `t: 0`, 목표 되돌리기 확인문도 HABITS에서 생성.
+- `src/views/today.js`: 오늘 기준 `goalsOf(state, t)`, undoStack에 키가 없어도 렌더.
+- `habitMonthStats`: 습관별 `days`(자기 표본 일수)로 비율. 활성일 전 달의 턱걸이 행은 0, 비율 —. 옛 습관 수치는 그대로.
+- `index.html` 룰 노트 기본 숫자 4개, '세 습관 모두' → '일간 습관 모두'. README 습관 목록, 스키마(`pullupStart`, `t`).
+- 결정(사용자 미확인): 최소 5회와 +5/+10/+20은 독서(20분, 최소 5분) 패턴. 설정에서 바꿀 수 있다. 헬스 탭 pullup 프리셋은 별개 저장소라 손대지 않음.
+
+## 검증
+
+- `npm test`: 25 files / 249 tests 통과(기존 230 + `test/pullup.test.js` 17 + settings.dom, today.dom 각 1).
+  storage, reflection.dom 픽스처는 load/import가 `pullupStart`를 채우는 변화에 맞춰 갱신. 기존 logic, trends 테스트는 무수정 통과(소급 없음의 증거).
+- `npm run typecheck`, `npm run build` 통과.
+- `node scripts/browser_qa.cjs`: 390/320/1200 가로 넘침 0, 브라우저 오류 0, 오늘 카드 6개(세 번째 턱걸이). 시드에 `pullupStart: 오늘`, 오늘 기록 `t: 5`.
+- dist 수동 스크린샷(390px, 활성일=오늘, 17~18일 세 습관 정상): 턱걸이 카드 5/20회 '최소', 연속 생존 3일, 17~18일 캔들 정상 유지, 설정 4행.
+
+## 남은 일
+
+- 커밋과 `npm run deploy`(gh-pages 강제 푸시)는 사용자 승인 후. 배포 뒤 `node scripts/browser_qa.cjs --live-smoke`.
+- 폰에서 업데이트된 앱을 처음 여는 날이 `pullupStart`가 된다(배포일이 아님). 그날부터 턱걸이 없이는 미달.
+
+---
+
 # 헬스 탭 — Iron Terminal 통합 — 2026-10-13
 
 ## 현재 작업

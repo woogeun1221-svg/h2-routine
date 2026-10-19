@@ -64,6 +64,21 @@ describe('renderSettings DOM 스모크', () => {
     vi.unstubAllGlobals();
   });
 
+  it('턱걸이 활성일이 있으면 4행 — 세 번째가 턱걸이 20/5, 독서는 네 번째', () => {
+    const setGoal = vi.fn();
+    renderSettings({ ...st(), pullupStart: '2026-10-19' }, { setGoal });
+    const rows = document.querySelectorAll('#goalRows .goal-row');
+    expect(rows.length).toBe(4);
+    expect(rows[2].querySelector('.goal-name').textContent).toContain('턱걸이');
+    const tInputs = rows[2].querySelectorAll('input');
+    expect(tInputs[0].value).toBe('20');
+    expect(tInputs[1].value).toBe('5');
+    expect(rows[3].querySelector('.goal-name').textContent).toContain('독서');
+    tInputs[0].value = '15';
+    tInputs[0].dispatchEvent(new Event('change'));
+    expect(setGoal).toHaveBeenCalledWith('t', 15, 5);
+  });
+
   it('값이 그대로면 setGoal 미호출 (재렌더 루프 방지)', () => {
     const setGoal = vi.fn();
     renderSettings(st(), { setGoal });
