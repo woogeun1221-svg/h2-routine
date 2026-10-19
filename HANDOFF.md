@@ -27,7 +27,7 @@
 ## 배포
 
 - 사용자 승인(2026-10-19 "OK") 후 기능 소스 `8c0827b` 커밋, `npm run deploy`로 `gh-pages` `b8da299` 강제 푸시(테스트 249건, 빌드 통과).
-- `origin/main`에는 아직 push 하지 않음(승인 범위가 커밋과 배포였음). 다음 push 때 함께 올리면 된다.
+- 사용자 요청으로 `origin/main` push 완료(`b4bb545..dac274b`).
 - 배포 15초 뒤 공개 URL이 새 번들(`index-20dEB1Gg.js`)을 서빙. `node scripts/browser_qa.cjs --live-smoke`: HTTP 200, 질문과 추이, 헬스 탭 마운트, 브라우저 오류 0. 공개 HTML에 바뀐 룰 노트 문구 확인.
 - 폰에서 업데이트된 앱을 처음 여는 날이 `pullupStart`가 된다(배포일이 아님). 그날부터 턱걸이 없이는 미달. 밤늦게 처음 열면 그날 바로 5회가 필요하다.
 
