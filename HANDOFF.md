@@ -45,7 +45,10 @@
 
 ## 배포
 
-- 미실행. 승인 후 `git add -A && git commit` → `npm run deploy`(테스트, 빌드 후 gh-pages 강제 푸시) → `node scripts/browser_qa.cjs --live-smoke`.
+- 사용자 승인("OK", 끝까지 진행) 후 기능 소스 `40a835f` 커밋, `npm run deploy`로 `gh-pages` `468297a` 강제 푸시(테스트 282건, 빌드 통과), `origin/main` push(`1a8272b..40a835f`).
+- 공개 URL이 새 번들(`index-D2Fyi04p.js`)을 서빙하는 것을 확인한 뒤 `node scripts/browser_qa.cjs --live-smoke`: HTTP 200, 새 질문 문구와 모토, 카드 6개, 손익비 카드,
+  추이와 아카이브, 헬스 탭 마운트, 브라우저 오류 0.
+- 폰에서 업데이트된 앱을 처음 여는 날이 `squatEnd`이자 `rrSnapshotStart`가 된다. 그날부터 스쿼트 없이 판정하고, 그 주 금요일부터 손익비 스냅샷이 없으면 금요일 미달.
 - 헬스 탭 하체 프로그램의 스쿼트(`ironterminal:v1`)는 손대지 않았다.
 
 ---
