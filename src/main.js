@@ -7,7 +7,7 @@ import '@fontsource/ibm-plex-mono/600.css';
 import '@fontsource/ibm-plex-mono/700.css';
 import './styles.css';
 import { registerSW } from 'virtual:pwa-register';
-import { HABITS, todayStr, getDay, shift, monthList, shiftMonth, investmentReviewStatus } from './logic.js';
+import { HABITS, WEEKLIES, goalsOf, todayStr, getDay, shift, monthList, shiftMonth, weeklyStatus } from './logic.js';
 import { load, save as persist, exportText, importText, freshState } from './storage.js';
 import { renderToday } from './views/today.js';
 import { renderTrends } from './views/trends.js';
@@ -31,6 +31,7 @@ function emptyUndo() {
 }
 var undoStack = emptyUndo();
 var renderedDate = null;
+var viewDate = null;           // null = 오늘. 과거 날짜 기록을 수정 중이면 'YYYY-MM-DD'
 var activeTab = 'today';       // 'today' | 'trends' | 'iron' | 'settings'
 var trendYm = null;            // 추이 화면에서 보고 있는 달 — 진입 시 이번 달로 리셋
 var calendarMode = 'self';
@@ -69,13 +70,24 @@ function save() {
   }
 }
 
-/* ---------- mutations (v1과 동일하게 항상 '지금'의 오늘 날짜에 기록) ---------- */
+/* ---------- mutations ----------
+   v1은 항상 '지금'의 오늘에 기록했다. 지금은 기록 대상이 targetDay() — 기본은 오늘, 과거 날짜를 고르면 그날.
+   요약 수치(연속 생존, 이달 정상, 배너)는 render()에서 계속 오늘 기준으로 계산한다. */
+function targetDay() { return viewDate || todayStr(); }
+function selectDay(ds) {
+  var t = todayStr();
+  if (ds > t) ds = t;
+  if (ds < state.startDate) ds = state.startDate;
+  viewDate = (ds === t) ? null : ds;
+  undoStack = emptyUndo();   // 되돌리기는 날짜마다 따로 — 섞이면 다른 날 수치를 깎는다
+  render();
+}
 function ensureDay(t) {
   if (!state.days[t]) state.days[t] = { p: 0, s: 0, t: 0, r: 0, w: null };
   return state.days[t];
 }
 function addVal(key, step) {
-  var t = todayStr();
+  var t = targetDay();
   undoStack[key].push(step);
   ensureDay(t)[key] = (getDay(state, t)[key] || 0) + step;
   save(); render();
@@ -83,18 +95,18 @@ function addVal(key, step) {
 function undoVal(key) {
   var last = undoStack[key].pop();
   if (last == null) return;
-  var t = todayStr();
+  var t = targetDay();
   ensureDay(t)[key] = Math.max(0, (getDay(state, t)[key] || 0) - last);
   save(); render();
 }
 function setDirect(key, n) {
-  var t = todayStr();
+  var t = targetDay();
   ensureDay(t)[key] = n;
   undoStack[key] = [];
   save(); render();
 }
 function toggleW(v) {
-  var t = todayStr();
+  var t = targetDay();
   var curW = getDay(state, t).w || null;
   ensureDay(t).w = (curW === v) ? null : v;
   save(); render();
@@ -108,17 +120,21 @@ function setReflectionReason(day, reason) {
   ensureDay(day).selfReason = reason;
   save(); // 입력 중 재렌더하지 않아 한글 조합과 커서를 보존한다.
 }
-function toggleInvestmentReview() {
-  var t = todayStr();
-  var review = investmentReviewStatus(state, t);
+/* 주간 항목(투자 원칙 i, 손익비 스냅샷 rr) 완료 토글 — 완료 취소는 그 주의 완료 표시를 모두 지운다 */
+function toggleWeekly(key) {
+  var item = WEEKLIES.filter(function (w) { return w.key === key; })[0];
+  if (!item) return;
+  var t = targetDay();
+  var review = weeklyStatus(state, t, item);
   if (!review.active) return;
   if (review.done) {
-    var due = review.monday > state.investmentReviewStart ? review.monday : state.investmentReviewStart;
+    var start = state[item.startKey];
+    var due = review.monday > start ? review.monday : start;
     while (due <= t && due <= review.sunday) {
-      if (state.days[due]) delete state.days[due].i;
+      if (state.days[due]) delete state.days[due][item.key];
       due = shift(due, 1);
     }
-  } else ensureDay(t).i = true;
+  } else ensureDay(t)[item.key] = true;
   save(); render();
 }
 function setGoal(key, target, min) {
@@ -128,8 +144,10 @@ function setGoal(key, target, min) {
 }
 function resetGoals() {
   if (!state.settings) return;
-  var targets = HABITS.map(function (h) { return h.target; }).join(', ');
-  var mins = HABITS.map(function (h) { return h.min; }).join(', ');
+  var active = goalsOf(state).map(function (g) { return g.key; });
+  var defaults = HABITS.filter(function (h) { return active.indexOf(h.key) >= 0; }); // 은퇴한 습관은 빼고 안내
+  var targets = defaults.map(function (h) { return h.target; }).join(', ');
+  var mins = defaults.map(function (h) { return h.min; }).join(', ');
   if (!confirm('목표치를 기본값(정상 ' + targets + ' / 최소 ' + mins + ')으로 되돌릴까?')) return;
   delete state.settings;
   save(); render();
@@ -173,11 +191,12 @@ function render() {
   });
 
   if (activeTab === 'today') {
+    if (viewDate && viewDate > t) viewDate = null; // 시계가 뒤로 간 경우 방어
     renderToday(state, t, {
       addVal: addVal, undoVal: undoVal, setDirect: setDirect, toggleW: toggleW,
       setReflection: setReflection, setReflectionReason: setReflectionReason,
-      toggleInvestmentReview: toggleInvestmentReview, undoStack: undoStack
-    });
+      toggleWeekly: toggleWeekly, selectDay: selectDay, undoStack: undoStack
+    }, targetDay());
   } else if (activeTab === 'trends') {
     if (!trendYm) trendYm = t.slice(0, 7);
     renderTrends(state, t, trendYm, {
@@ -197,6 +216,11 @@ function render() {
 document.querySelectorAll('.tabbar .tab').forEach(function (b) {
   b.addEventListener('click', function () { switchTab(b.dataset.tab); });
 });
+
+/* 오늘 — 기록 날짜 이동 (범위는 renderToday가 disabled로 잠금, selectDay가 한 번 더 클램프) */
+document.getElementById('dayPrev').addEventListener('click', function () { selectDay(shift(targetDay(), -1)); });
+document.getElementById('dayNext').addEventListener('click', function () { selectDay(shift(targetDay(), 1)); });
+document.getElementById('todayBtn').addEventListener('click', function () { selectDay(todayStr()); });
 
 /* 추이 — 월 이동 (범위는 renderTrends가 disabled로 잠금) */
 document.getElementById('calPrev').addEventListener('click', function () {
@@ -256,7 +280,7 @@ function applyImport(text) {
   var existing = Object.keys(state.days).length;
   if (existing > 0 && !confirm('현재 기록 ' + existing + '일치를 가져온 데이터로 교체할까?')) return;
   state = incoming;
-  undoStack = emptyUndo();
+  undoStack = emptyUndo(); viewDate = null;
   save(); render();
   syncReflection();
   alert('가져오기 완료 — ' + Object.keys(state.days).length + '일치 기록, 시작일 ' + state.startDate);
@@ -282,7 +306,7 @@ document.getElementById('goalRestoreBtn').addEventListener('click', resetGoals);
 document.getElementById('resetBtn').addEventListener('click', function () {
   if (!confirm('모든 기록을 삭제할까? 되돌릴 수 없어.')) return;
   state = freshState(todayStr());
-  undoStack = emptyUndo();
+  undoStack = emptyUndo(); viewDate = null;
   try { persist(state); } catch (e) {}
   render();
   syncReflection();
@@ -306,7 +330,7 @@ document.addEventListener('visibilitychange', function () {
   if (document.visibilityState !== 'visible') return;
   if (swRegistration) swRegistration.update().catch(function () {});
   if (renderedDate && renderedDate !== todayStr()) {
-    undoStack = emptyUndo();
+    undoStack = emptyUndo(); viewDate = null;
     if (activeTab === 'trends') trendYm = todayStr().slice(0, 7);
     render();
   }
@@ -316,7 +340,7 @@ window.addEventListener('online', syncReflection);
 setInterval(function () {
   if (document.visibilityState !== 'visible') return;
   if (renderedDate !== todayStr()) {
-    undoStack = emptyUndo();
+    undoStack = emptyUndo(); viewDate = null;
     if (activeTab === 'trends') trendYm = todayStr().slice(0, 7);
     render();
   }

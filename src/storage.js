@@ -1,16 +1,19 @@
 /* localStorage 저장 + JSON 내보내기/가져오기. v1 스키마에 선택 필드만 추가:
-   { startDate, investmentReviewStart?, pullupStart?, days: { date: { p, s, t?, r, w, i? } } }
-   i=true는 그날 투자 원칙 주간 검토를 완료했다는 뜻이며 요일 제한은 없다.
+   { startDate, investmentReviewStart?, rrSnapshotStart?, pullupStart?, squatEnd?, days: { date: { p, s, t?, r, w, i?, rr? } } }
+   i=true는 그날 투자 원칙 주간 검토를, rr=true는 그날 손익비 스냅샷(2026-10-29 추가)을 완료했다는 뜻이며 요일 제한은 없다.
    t는 턱걸이(2026-10-19 추가). pullupStart는 턱걸이가 판정에 들어가는 첫날로, 처음 연 날에 채운다.
+   squatEnd는 스쿼트(2026-10-29 은퇴)가 판정에서 빠지는 첫날로, 역시 처음 연 날에 채운다. 그 전 기록의 s는 그대로 판정한다.
    self=o/x/null, selfReason은 하루 만족도 선택/이유이며 기존 루틴 판정과 별개다. */
-import { HABITS } from './logic.js';
+import { HABITS, WEEKLIES } from './logic.js';
 
 var STORE_KEY = 'h2-routine-v1';
 var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 var HABIT_KEYS = HABITS.map(function (h) { return h.key; });
-/* 기능 활성일 필드 — 없으면 처음 연 날로 채워 기존 기록을 소급 판정하지 않는다 */
-var START_KEYS = ['investmentReviewStart'].concat(
-  HABITS.filter(function (h) { return h.startKey; }).map(function (h) { return h.startKey; }));
+/* 기능 활성일, 종료일 필드 — 없으면 처음 연 날로 채워 기존 기록을 소급 판정하지 않는다 */
+var WEEKLY_KEYS = WEEKLIES.map(function (w) { return w.key; });
+var START_KEYS = WEEKLIES.map(function (w) { return w.startKey; }).concat(
+  HABITS.filter(function (h) { return h.startKey; }).map(function (h) { return h.startKey; }),
+  HABITS.filter(function (h) { return h.endKey; }).map(function (h) { return h.endKey; }));
 
 export function freshState(today) {
   var state = { startDate: today, days: {} };
@@ -46,7 +49,10 @@ export function validateState(obj) {
       }
     }
     if (d.w !== undefined && d.w !== null && d.w !== 'o' && d.w !== 'x') return k + '.w 값 오류';
-    if (d.i !== undefined && typeof d.i !== 'boolean') return k + '.i 값 오류';
+    for (var wi = 0; wi < WEEKLY_KEYS.length; wi++) {
+      var wk = WEEKLY_KEYS[wi];
+      if (d[wk] !== undefined && typeof d[wk] !== 'boolean') return k + '.' + wk + ' 값 오류';
+    }
     if (d.self !== undefined && d.self !== null && d.self !== 'o' && d.self !== 'x') return k + '.self 값 오류';
     if (d.selfReason !== undefined && (typeof d.selfReason !== 'string' || d.selfReason.length > 4000)) {
       return k + '.selfReason 값 오류';

@@ -15,11 +15,11 @@ const KEY = 'h2-routine-v1';
 describe('load — 손상 데이터 처리', () => {
   beforeEach(() => mem.clear());
 
-  it('기존 일간 기록은 그대로 두고 주간 루틴, 턱걸이 활성일만 추가', () => {
+  it('기존 일간 기록은 그대로 두고 주간 루틴, 턱걸이 활성일, 스쿼트 종료일만 추가', () => {
     const state = { startDate: '2026-06-29', days: { '2026-06-29': { p: 100, s: 100, r: 20, w: 'o' } } };
     mem.set(KEY, JSON.stringify(state));
     const loaded = load('2026-07-23');
-    expect(loaded).toEqual({ ...state, investmentReviewStart: '2026-07-23', pullupStart: '2026-07-23' });
+    expect(loaded).toEqual({ ...state, investmentReviewStart: '2026-07-23', rrSnapshotStart: '2026-07-23', pullupStart: '2026-07-23', squatEnd: '2026-07-23' });
     expect(loaded.days).toEqual(state.days);
     expect(mem.has(KEY + '.bak')).toBe(false);
   });
@@ -29,6 +29,7 @@ describe('load — 손상 데이터 처리', () => {
     expect(s.startDate).toBe('2026-07-23');
     expect(s.investmentReviewStart).toBe('2026-07-23');
     expect(s.pullupStart).toBe('2026-07-23');
+    expect(s.squatEnd).toBe('2026-07-23');
     expect(s.days).toEqual({});
     expect(mem.has(KEY + '.bak')).toBe(false);
   });
@@ -49,8 +50,8 @@ describe('load — 손상 데이터 처리', () => {
 
   it('save 후 load 라운드트립', () => {
     const state = {
-      startDate: '2026-07-01', investmentReviewStart: '2026-07-20', pullupStart: '2026-07-21',
-      days: { '2026-07-22': { p: 30, s: 30, t: 5, r: 5, w: null, i: true } }
+      startDate: '2026-07-01', investmentReviewStart: '2026-07-20', rrSnapshotStart: '2026-07-20', pullupStart: '2026-07-21', squatEnd: '2026-07-22',
+      days: { '2026-07-22': { p: 30, s: 30, t: 5, r: 5, w: null, i: true, rr: true } }
     };
     save(state);
     expect(load('2026-07-23')).toEqual(state);

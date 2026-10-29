@@ -79,6 +79,15 @@ describe('renderSettings DOM 스모크', () => {
     expect(setGoal).toHaveBeenCalledWith('t', 15, 5);
   });
 
+  it('스쿼트 종료일이 있으면 스쿼트 행은 빠진다 — 푸쉬업, 턱걸이, 독서 3행', () => {
+    renderSettings({ ...st(), pullupStart: '2026-10-19', squatEnd: '2026-10-29' }, { setGoal: () => {} });
+    const names = [...document.querySelectorAll('#goalRows .goal-name')].map(el => el.textContent);
+    expect(names.length).toBe(3);
+    expect(names[0]).toContain('푸쉬업');
+    expect(names[1]).toContain('턱걸이');
+    expect(names[2]).toContain('독서');
+  });
+
   it('값이 그대로면 setGoal 미호출 (재렌더 루프 방지)', () => {
     const setGoal = vi.fn();
     renderSettings(st(), { setGoal });

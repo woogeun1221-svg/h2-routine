@@ -1,16 +1,26 @@
 /* 오늘 화면 렌더 — 일간 카드와 주간 투자 원칙 검토.
-   h(핸들러): { addVal, undoVal, setDirect, toggleW, toggleInvestmentReview, undoStack }. */
+   h(핸들러): { addVal, undoVal, setDirect, toggleW, toggleWeekly(key), selectDay, undoStack }.
+   day를 주면 그날(과거) 기록을 보여 주고 카드 입력이 그날에 쓰인다 — 연속 생존, 이달 정상, 어제 미달 배너는
+   항상 오늘(t) 기준이다. 카드 목록은 goalsOf(state, day)라 그날 활성이던 습관(은퇴 전 스쿼트 등)이 그대로 나온다. */
 import {
-  WIFE, INVESTMENT_REVIEW, goalsOf, shift, daysBetween, weekday,
-  getDay, statusOf, completion, streak, monthFullRate, investmentReviewStatus
+  WIFE, WEEKLIES, goalsOf, shift, daysBetween, weekday,
+  getDay, statusOf, completion, streak, monthFullRate, weeklyStatus
 } from '../logic.js';
 import { renderReflection } from './reflection.js';
 
-export function renderToday(state, t, h) {
-  renderReflection(state, t, h);
-  var p = t.split('-');
-  document.getElementById('dateStr').textContent = p[0] + '.' + p[1] + '.' + p[2] + ' ' + weekday(t);
-  document.getElementById('dplus').textContent = 'D+' + (daysBetween(state.startDate, t) + 1);
+export function renderToday(state, t, h, day) {
+  day = day || t;
+  var isToday = day === t;
+  renderReflection(state, day, h, isToday);
+  var p = day.split('-');
+  document.getElementById('dateStr').textContent = p[0] + '.' + p[1] + '.' + p[2] + ' ' + weekday(day);
+  document.getElementById('dplus').textContent = 'D+' + (daysBetween(state.startDate, day) + 1);
+  document.getElementById('dayPrev').disabled = day <= state.startDate;
+  document.getElementById('dayNext').disabled = isToday;
+  var notice = document.getElementById('editNotice');
+  notice.className = 'edit-notice' + (isToday ? '' : ' show');
+  document.getElementById('editNoticeText').textContent = isToday ? '' :
+    p[1] + '.' + p[2] + ' ' + weekday(day) + '요일 기록을 수정하는 중 — 입력 즉시 저장';
 
   document.getElementById('streak').textContent = streak(state, t) + '일';
   var fr = monthFullRate(state, t);
@@ -26,8 +36,8 @@ export function renderToday(state, t, h) {
   document.getElementById('goalFullNums').textContent = goals.map(function (g) { return g.target; }).join(' · ');
   document.getElementById('goalMinNums').textContent = goals.map(function (g) { return g.min; }).join(' · ');
 
-  renderCards(state, t, h);
-  renderStrip(state, t);
+  renderCards(state, day, h);
+  renderStrip(state, t, h, day);
 }
 
 function renderCards(state, t, h) {
@@ -105,19 +115,21 @@ function renderCards(state, t, h) {
   wc.appendChild(wtop); wc.appendChild(seg);
   wrap.appendChild(wc);
 
-  renderInvestmentReviewCard(state, t, h, wrap);
+  WEEKLIES.forEach(function (item) { renderWeeklyCard(state, t, h, wrap, item); });
 }
 
-function renderInvestmentReviewCard(state, t, h, wrap) {
-  var review = investmentReviewStatus(state, t);
+/* 주간 카드 — 투자 원칙, 손익비 스냅샷. 문구는 item(action, upcoming, open)에서, 나머지 단계 문구는 공통. */
+function renderWeeklyCard(state, t, h, wrap, item) {
+  var review = weeklyStatus(state, t, item);
   var card = document.createElement('div');
   card.className = 'card weekly-card review-' + review.phase;
+  card.dataset.weekly = item.key;
 
   var top = document.createElement('div'); top.className = 'card-top';
   var nm = document.createElement('div'); nm.className = 'card-name';
-  nm.textContent = INVESTMENT_REVIEW.name;
+  nm.textContent = item.name;
   var sub = document.createElement('span'); sub.className = 'card-sub';
-  sub.textContent = INVESTMENT_REVIEW.sub;
+  sub.textContent = item.sub;
   nm.appendChild(sub);
 
   if (review.done || review.phase === 'deadline' || review.phase === 'missed') {
@@ -133,9 +145,9 @@ function renderInvestmentReviewCard(state, t, h, wrap) {
     status.textContent = review.reviewedOn.slice(5).replace('-', '.') + ' ' + weekday(review.reviewedOn) +
       '요일 완료' + (review.reviewedOn > review.friday ? ' · 마감 후' : '');
   } else if (review.phase === 'upcoming') {
-    status.textContent = '목·금 권장 · 지금 미리 완료할 수 있음';
+    status.textContent = item.upcoming;
   } else if (review.phase === 'open') {
-    status.textContent = '권장일 — 오늘 또는 내일';
+    status.textContent = item.open;
   } else if (review.phase === 'deadline') {
     status.textContent = '권장 마감일 — 아직 미완료';
   } else if (review.phase === 'missed') {
@@ -143,16 +155,23 @@ function renderInvestmentReviewCard(state, t, h, wrap) {
   } else {
     status.textContent = '업데이트 이후 주간 기록 시작';
   }
+  if (item.link) {
+    /* 대시보드 바로가기 — 토큰 로그인은 그쪽에서. 표준 모드 PWA에서는 Safari로 열린다 */
+    var a = document.createElement('a'); a.className = 'weekly-link';
+    a.href = item.link; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = '대시보드 열기 ↗';
+    status.appendChild(document.createTextNode(' ')); status.appendChild(a);
+  }
   card.appendChild(top); card.appendChild(status);
 
   var btns = document.createElement('div'); btns.className = 'btns';
   var b = document.createElement('button'); b.className = 'btn weekly-btn';
   if (review.active) {
     b.textContent = review.done ? '이번 주 완료 취소' :
-      (review.phase === 'missed' ? '늦게라도 완료' : '정독·검토 완료');
+      (review.phase === 'missed' ? '늦게라도 완료' : item.action);
     b.setAttribute('aria-pressed', review.done ? 'true' : 'false');
     if (review.done) b.className += ' sel-o';
-    b.addEventListener('click', h.toggleInvestmentReview);
+    b.addEventListener('click', function () { h.toggleWeekly(item.key); });
   } else {
     b.textContent = '기록 시작 전';
     b.disabled = true;
@@ -160,12 +179,17 @@ function renderInvestmentReviewCard(state, t, h, wrap) {
   btns.appendChild(b); card.appendChild(btns); wrap.appendChild(card);
 }
 
-function renderStrip(state, t) {
+/* 14일 스트립 — 칸을 누르면 그날 기록 수정으로 이동(시작일 전은 비활성). 선택 중인 과거 날짜는 황동 테두리. */
+function renderStrip(state, t, h, day) {
   var wrap = document.getElementById('strip');
   wrap.innerHTML = '';
   for (var i = 13; i >= 0; i--) {
     var ds = shift(t, -i);
-    var cell = document.createElement('div'); cell.className = 'day';
+    var cell = document.createElement('button'); cell.type = 'button';
+    cell.className = 'day' + (ds === day && ds !== t ? ' selected' : '');
+    cell.disabled = ds < state.startDate;
+    cell.setAttribute('aria-label', ds + ' 기록 보기');
+    cell.addEventListener('click', (function (d) { return function () { if (h && h.selectDay) h.selectDay(d); }; })(ds));
     var slot = document.createElement('div'); slot.className = 'candle-slot';
     var c = document.createElement('div'); c.className = 'candle';
     if (ds >= state.startDate) {

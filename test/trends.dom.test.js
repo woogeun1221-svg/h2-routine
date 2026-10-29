@@ -88,6 +88,31 @@ describe('renderTrends DOM 스모크', () => {
     expect(document.getElementById('wifeLine').textContent).toBe('');
   });
 
+  it('스쿼트 종료일을 걸친 달은 스쿼트 행이 남고, 종료 다음 달은 빠진다', () => {
+    const state = { startDate: '2026-09-20', squatEnd: '2026-10-05', days: {
+      '2026-09-30': FULL, '2026-10-01': FULL, '2026-10-04': MIN, '2026-10-06': { p: 100, r: 20, w: null }
+    } };
+    renderTrends(state, '2026-11-10', '2026-10', { mode: 'routine' });
+    let names = [...document.querySelectorAll('#habitBody tr td:first-child')].map(td => td.textContent);
+    expect(names).toEqual(['푸쉬업', '스쿼트', '독서']);
+    renderTrends(state, '2026-11-10', '2026-11', { mode: 'routine' });
+    names = [...document.querySelectorAll('#habitBody tr td:first-child')].map(td => td.textContent);
+    expect(names).toEqual(['푸쉬업', '독서']);
+  });
+
+  it('손익비 스냅샷 주간 통계는 투자 원칙 다음 행, 활성일 없으면 행 없음', () => {
+    const state = {
+      startDate: '2026-08-01', investmentReviewStart: '2026-08-03', rrSnapshotStart: '2026-08-03',
+      days: { '2026-08-05': { ...FULL, i: true }, '2026-08-08': { rr: true } }
+    };
+    renderTrends(state, '2026-08-10', '2026-08');
+    const rows = document.querySelectorAll('#habitBody tr');
+    expect(rows.length).toBe(5);
+    expect(rows[3].textContent).toContain('투자 원칙(주)');
+    expect(rows[4].textContent).toContain('손익비 스냅샷(주)');
+    expect(rows[4].querySelector('.c-min').textContent).toBe('1'); // 토요일 완료 = 최소
+  });
+
   it('투자 원칙 주간 통계를 습관별 표의 네 번째 행으로 표시', () => {
     const state = {
       startDate: '2026-08-01', investmentReviewStart: '2026-08-03',

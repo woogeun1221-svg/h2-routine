@@ -2,37 +2,60 @@
    모든 함수가 (state, today)를 인자로 받는 순수 함수. */
 
 /* startKey가 있는 습관은 state[startKey](기능 활성일)부터만 판정에 들어간다 — 투자 원칙과 같은
-   규칙으로, 추가 전 날짜를 소급해 미달로 바꾸지 않는다. 활성일이 없는 상태에선 없는 습관으로 본다. */
+   규칙으로, 추가 전 날짜를 소급해 미달로 바꾸지 않는다. 활성일이 없는 상태에선 없는 습관으로 본다.
+   endKey가 있는 습관은 state[endKey](종료일)부터 판정에서 빠진다. 종료일 전 날짜는 그대로 판정하므로
+   과거 스트릭, 정상률, 장부가 소급해 바뀌지 않는다. 종료일이 없는 상태(옛 백업, 테스트 픽스처)에선 계속 활성.
+   스쿼트는 2026-10-29 은퇴 — 정의를 지우면 settings.s가 검증에서 거부돼 기록이 fresh로 떨어지므로 남겨 둔다. */
 export const HABITS = [
-  { key: 'p', name: '푸쉬업', unit: '회', target: 100, min: 30, steps: [10, 25, 50] },
-  { key: 's', name: '스쿼트', unit: '회', target: 100, min: 30, steps: [10, 25, 50] },
+  { key: 'p', name: '푸쉬업', unit: '회', target: 100, min: 30, steps: [5, 10, 25] },
+  { key: 's', name: '스쿼트', unit: '회', target: 100, min: 30, steps: [10, 25, 50], endKey: 'squatEnd' },
   { key: 't', name: '턱걸이', unit: '회', target: 20,  min: 5,  steps: [5, 10, 20], startKey: 'pullupStart' },
   { key: 'r', name: '독서',   unit: '분', target: 20,  min: 5,  steps: [5, 10, 20] }
 ];
 
 export const WIFE = { key: 'w', name: '송은', sub: '해결 먼저, 감정 나중' };
-export const INVESTMENT_REVIEW = {
-  key: 'i', name: '투자 원칙 정독·검토', sub: '매주 1회 · 목·금 권장'
-};
 
-/* 유효 목표치 — state.settings의 오버라이드를 HABITS 기본값 위에 적용.
-   settings가 없거나 값이 이상하면 기본값 (v1 데이터 호환).
-   ds를 주면 그날 판정에 들어가는 습관만, 없으면(설정 화면) 활성화된 습관 전부. */
-export function goalsOf(state, ds) {
+/* 주간 항목 — 월요일 시작 주간에 한 번, 어느 날이든 완료할 수 있고 금요일까지 미완료면 그 금요일이 미달.
+   각자 startKey(활성일)부터 판정하고 day 기록에는 key=true로 완료일을 남긴다. 서로 독립이다.
+   action/upcoming/open은 오늘 카드 문구, statName은 추이 표의 행 이름. */
+export const INVESTMENT_REVIEW = {
+  key: 'i', name: '투자 원칙 정독·검토', sub: '매주 1회 · 목·금 권장', startKey: 'investmentReviewStart',
+  action: '정독·검토 완료', upcoming: '목·금 권장 · 지금 미리 완료할 수 있음', open: '권장일 — 오늘 또는 내일',
+  statName: '투자 원칙(주)'
+};
+export const RR_SNAPSHOT = {
+  key: 'rr', name: '손익비 스냅샷', sub: '매주 1회, 금요일까지', startKey: 'rrSnapshotStart',
+  action: '스냅샷 완료', upcoming: '금요일 장 마감 뒤 권장, 지금 미리 완료할 수 있음', open: '권장일, 오늘 또는 내일',
+  statName: '손익비 스냅샷(주)', link: 'https://macmini.taile484c7.ts.net/rr/'
+};
+export const WEEKLIES = [INVESTMENT_REVIEW, RR_SNAPSHOT];
+
+/* 습관 하나의 유효 목표치와 활성 구간 — state.settings의 오버라이드를 HABITS 기본값 위에 적용.
+   settings가 없거나 값이 이상하면 기본값 (v1 데이터 호환). since/until은 날짜 문자열 또는 null. */
+function habitGoal(state, h) {
+  var o = (state.settings && state.settings[h.key]) || {};
+  var target = (typeof o.target === 'number' && o.target >= 1) ? o.target : h.target;
+  var min = (typeof o.min === 'number' && o.min >= 1) ? o.min : h.min;
+  if (min > target) min = target; // 어떤 조합이 와도 최소 ≤ 정상 보장
+  return {
+    key: h.key, name: h.name, unit: h.unit, steps: h.steps, target: target, min: min,
+    since: (h.startKey && typeof state[h.startKey] === 'string') ? state[h.startKey] : null,
+    until: (h.endKey && typeof state[h.endKey] === 'string') ? state[h.endKey] : null
+  };
+}
+
+/* 활성일이 있는 습관 전부(은퇴한 습관 포함) — 월간 통계처럼 과거 구간을 봐야 할 때 쓴다. */
+export function habitSpans(state) {
   return HABITS.filter(function (h) {
-    if (!h.startKey) return true;
-    var since = state[h.startKey];
-    if (typeof since !== 'string') return false;
-    return ds === undefined || ds >= since;
-  }).map(function (h) {
-    var o = (state.settings && state.settings[h.key]) || {};
-    var target = (typeof o.target === 'number' && o.target >= 1) ? o.target : h.target;
-    var min = (typeof o.min === 'number' && o.min >= 1) ? o.min : h.min;
-    if (min > target) min = target; // 어떤 조합이 와도 최소 ≤ 정상 보장
-    return {
-      key: h.key, name: h.name, unit: h.unit, steps: h.steps, target: target, min: min,
-      since: h.startKey ? state[h.startKey] : null
-    };
+    return !h.startKey || typeof state[h.startKey] === 'string';
+  }).map(function (h) { return habitGoal(state, h); });
+}
+
+/* ds를 주면 그날 판정에 들어가는 습관만, 없으면(설정 화면) 지금 활성화된 습관 전부(은퇴 제외). */
+export function goalsOf(state, ds) {
+  return habitSpans(state).filter(function (g) {
+    if (ds === undefined) return !g.until;
+    return (!g.since || ds >= g.since) && (!g.until || ds < g.until);
   });
 }
 
@@ -75,9 +98,11 @@ export function investmentReviewWindow(ds) {
   };
 }
 
-export function investmentReviewStatus(state, ds) {
+/* 주간 항목 하나의 ds 기준 상태. item 생략 시 투자 원칙(기존 호출 호환). */
+export function weeklyStatus(state, ds, item) {
+  item = item || INVESTMENT_REVIEW;
   var win = investmentReviewWindow(ds);
-  var start = state.investmentReviewStart;
+  var start = state[item.startKey];
   if (typeof start !== 'string' || ds < start) {
     return { active: false, done: false, phase: 'inactive', reviewedOn: null, ...win };
   }
@@ -85,7 +110,7 @@ export function investmentReviewStatus(state, ds) {
   var reviewedOn = null, cur = win.monday > start ? win.monday : start;
   var to = ds < win.sunday ? ds : win.sunday;
   while (cur <= to) {
-    if (getDay(state, cur).i === true) { reviewedOn = cur; break; }
+    if (getDay(state, cur)[item.key] === true) { reviewedOn = cur; break; }
     cur = shift(cur, 1);
   }
 
@@ -97,6 +122,7 @@ export function investmentReviewStatus(state, ds) {
   else phase = 'missed';
   return { active: true, done: !!reviewedOn, phase: phase, reviewedOn: reviewedOn, ...win };
 }
+export function investmentReviewStatus(state, ds) { return weeklyStatus(state, ds, INVESTMENT_REVIEW); }
 
 /* ---------- status logic ---------- */
 export function getDay(state, ds) { return state.days[ds] || { p: 0, s: 0, t: 0, r: 0, w: null, i: false }; }
@@ -109,10 +135,12 @@ export function statusOf(state, ds) {
     if (v < h.min) min = false;
   }
   if (d.w === 'x') { full = false; min = false; }  // X = 그날 전체 미달
-  var review = investmentReviewStatus(state, ds);
-  if (review.active && ds === review.friday && !review.done) {
-    full = false; min = false; // 금요일까지 거르면 그날 전체 미달
-  }
+  WEEKLIES.forEach(function (item) {
+    var review = weeklyStatus(state, ds, item);
+    if (review.active && ds === review.friday && !review.done) {
+      full = false; min = false; // 금요일까지 거르면 그날 전체 미달
+    }
+  });
   return full ? 'full' : (min ? 'min' : 'miss');
 }
 
@@ -122,11 +150,13 @@ export function completion(state, ds) {
     var h = goals[i]; sum += Math.min(1, (d[h.key] || 0) / h.target);
   }
   var count = goals.length;
-  var review = investmentReviewStatus(state, ds);
-  if (review.active && ds === review.friday) {
-    sum += review.done ? 1 : 0;
-    count++;
-  }
+  WEEKLIES.forEach(function (item) {
+    var review = weeklyStatus(state, ds, item);
+    if (review.active && ds === review.friday) {
+      sum += review.done ? 1 : 0;
+      count++;
+    }
+  });
   return sum / count;
 }
 
@@ -204,7 +234,8 @@ export function calMonth(state, ym, today) {
     if (ds < state.startDate) kind = 'out';
     else if (ds > today) kind = 'future';
     else if (ds === today) {
-      var recorded = completion(state, ds) > 0 || getDay(state, ds).w || getDay(state, ds).i;
+      var rec = getDay(state, ds);
+      var recorded = completion(state, ds) > 0 || rec.w || WEEKLIES.some(function (item) { return rec[item.key]; });
       kind = recorded ? statusOf(state, ds) : 'pending';
     } else kind = statusOf(state, ds);
     cells.push({ ds: ds, day: d, kind: kind });
@@ -212,15 +243,15 @@ export function calMonth(state, ym, today) {
   return { lead: lead, cells: cells };
 }
 
-/* 투자 원칙 월간 통계 — 주간 마감일인 금요일이 속한 달에 귀속한다.
+/* 주간 항목 월간 통계 — 주간 마감일인 금요일이 속한 달에 귀속한다.
    금요일까지 완료=정상, 토·일 완료=최소, 일요일까지 미완료=미달.
-   완료했거나 일요일이 지난 주만 확정 표본으로 센다. */
-function investmentReviewMonthStats(state, ym, today) {
-  var start = state.investmentReviewStart;
+   완료했거나 일요일이 지난 주만 확정 표본으로 센다. 활성일 없으면 null. */
+function weeklyMonthStats(state, ym, today, item) {
+  var start = state[item.startKey];
   if (typeof start !== 'string') return null;
 
   var result = {
-    key: INVESTMENT_REVIEW.key, name: '투자 원칙(주)', unit: '회',
+    key: item.key, name: item.statName, unit: '회',
     full: 0, min: 0, miss: 0, sum: 0, total: 0, fullRate: null, minRate: null
   };
   var monthStart = ym + '-01';
@@ -236,7 +267,7 @@ function investmentReviewMonthStats(state, ym, today) {
       var to = yest < win.sunday ? yest : win.sunday;
       var reviewedOn = null, cur = from;
       while (cur <= to) {
-        if (getDay(state, cur).i === true) { reviewedOn = cur; break; }
+        if (getDay(state, cur)[item.key] === true) { reviewedOn = cur; break; }
         cur = shift(cur, 1);
       }
       if (reviewedOn) {
@@ -259,15 +290,16 @@ function investmentReviewMonthStats(state, ym, today) {
 
 /* 습관별 월간 통계 — 해당 월 안에서 startDate부터 어제까지(확정분만).
    일간 습관은 자기 목표 기준 정상/최소/미달 일수, 누적 합, 달성률.
-   나중에 추가한 습관(since)은 활성일부터만 세고 days(자기 표본 일수)로 비율을 낸다.
-   투자 원칙은 위 주간 기준, 송은은 o/x/na 일수. total=0이면 일간 표본 없음. */
+   나중에 추가한 습관(since)은 활성일부터만, 은퇴한 습관(until)은 종료일 전까지만 세고
+   days(자기 표본 일수)로 비율을 낸다.
+   주간 항목은 위 주간 기준, 송은은 o/x/na 일수. total=0이면 일간 표본 없음. */
 export function habitMonthStats(state, ym, today) {
   var monthStart = ym + '-01';
   var from = monthStart > state.startDate ? monthStart : state.startDate;
   var monthEnd = ym + '-' + ('0' + daysInMonth(ym)).slice(-2);
   var yest = shift(today, -1);
   var to = monthEnd < yest ? monthEnd : yest;
-  var goals = goalsOf(state);
+  var goals = habitSpans(state);
   var habits = goals.map(function (h) {
     return { key: h.key, name: h.name, unit: h.unit, days: 0, full: 0, min: 0, miss: 0, sum: 0 };
   });
@@ -278,6 +310,7 @@ export function habitMonthStats(state, ym, today) {
     for (var i = 0; i < goals.length; i++) {
       var h = goals[i], hs = habits[i], v = d[h.key] || 0;
       if (h.since && cur < h.since) continue; // 추가 전 날짜는 그 습관의 표본이 아니다
+      if (h.until && cur >= h.until) continue; // 은퇴 후 날짜도 표본이 아니다
       hs.days++; hs.sum += v;
       if (v >= h.target) hs.full++;
       else if (v >= h.min) hs.min++;
@@ -291,7 +324,12 @@ export function habitMonthStats(state, ym, today) {
     habits[j].fullRate = n ? Math.round(habits[j].full / n * 100) : null;
     habits[j].minRate = n ? Math.round((habits[j].full + habits[j].min) / n * 100) : null;
   }
-  return { total: total, habits: habits, investment: investmentReviewMonthStats(state, ym, today), w: w };
+  /* 은퇴한 습관은 표본이 있는 달(은퇴 전)에만 행을 남긴다. 아직 활성일 전인 습관은 기존처럼 0, — 로 둔다. */
+  habits = habits.filter(function (hs, k) { return !(goals[k].until && hs.days === 0); });
+  /* weeklies: 활성화된 주간 항목 행(투자 원칙, 손익비 스냅샷 순). investment는 기존 호출 호환. */
+  var weeklies = WEEKLIES.map(function (item) { return weeklyMonthStats(state, ym, today, item); })
+    .filter(function (row) { return row; });
+  return { total: total, habits: habits, weeklies: weeklies, investment: weeklyMonthStats(state, ym, today, INVESTMENT_REVIEW), w: w };
 }
 
 /* 월별 장부 — startDate부터 어제까지, 최신 월부터. */

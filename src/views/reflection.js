@@ -1,9 +1,11 @@
 import { getDay } from '../logic.js';
 import { reflectionMonthStats, reflectionMonths, reflectionArchive } from '../reflection.js';
 
-export const REFLECTION_QUESTION = '가슴에 손을 얹고 스스로에게 만족할만한 하루를 보냈는가?';
+export const REFLECTION_QUESTION = '스스로에게 만족할만한 하루를 보냈는가?';
+export const REFLECTION_MOTTO = '컨트롤 할 수 있는 건 오로지 나뿐';
 
-export function renderReflection(state, day, handlers) {
+/* isToday=false면(과거 날짜 수정 중) 오늘 응답 전달 상태 문구는 숨긴다 — 그 줄은 오늘 이야기라서. */
+export function renderReflection(state, day, handlers, isToday = true) {
   const root = document.getElementById('reflection');
   if (!root) return;
   const entry = getDay(state, day);
@@ -13,6 +15,10 @@ export function renderReflection(state, day, handlers) {
   title.className = 'reflection-question';
   title.textContent = REFLECTION_QUESTION;
   root.appendChild(title);
+  const motto = document.createElement('p');
+  motto.className = 'reflection-motto';
+  motto.textContent = REFLECTION_MOTTO;
+  root.appendChild(motto);
 
   const choices = document.createElement('div');
   choices.className = 'btns reflection-choices';
@@ -45,10 +51,16 @@ export function renderReflection(state, day, handlers) {
 
   const footer = document.createElement('div');
   footer.className = 'reflection-footer';
-  const status = document.createElement('span');
-  status.id = 'reminderStatus';
-  status.setAttribute('role', 'status');
-  footer.appendChild(status);
+  if (isToday) {
+    const status = document.createElement('span');
+    status.id = 'reminderStatus';
+    status.setAttribute('role', 'status');
+    footer.appendChild(status);
+  } else {
+    const past = document.createElement('span');
+    past.textContent = day.replaceAll('-', '.') + ' 응답';
+    footer.appendChild(past);
+  }
   if (entry.self === 'o' || entry.self === 'x') {
     const clear = document.createElement('button');
     clear.className = 'reset';
@@ -65,11 +77,11 @@ export function renderReflectionHistory(state, month, today) {
   root.replaceChildren();
   const title = document.createElement('h2');
   title.className = 'reflection-section-title';
-  title.textContent = '가슴에 손을 얹고';
+  title.textContent = REFLECTION_QUESTION;
   root.appendChild(title);
   const subtitle = document.createElement('p');
   subtitle.className = 'settings-note';
-  subtitle.textContent = month.replace('-', '.') + ' · 스스로에게 만족할만한 하루를 보냈는가?';
+  subtitle.textContent = month.replace('-', '.') + ' 기록 — ' + REFLECTION_MOTTO;
   root.appendChild(subtitle);
   const stats = reflectionMonthStats(state, month, today);
   const chips = document.createElement('div');

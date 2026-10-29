@@ -93,8 +93,7 @@ function renderHabitStats(state, t, ym) {
     return;
   }
 
-  var rows = stats.habits.slice();
-  if (stats.investment) rows.push(stats.investment);
+  var rows = stats.habits.concat(stats.weeklies || []);
   rows.forEach(function (h) {
     var tr = document.createElement('tr');
     tr.innerHTML = '<td>' + h.name + '</td>' +

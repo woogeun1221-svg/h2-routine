@@ -51,6 +51,23 @@ h1.date {
   font-size: 26px; font-weight: 700; letter-spacing: -0.01em;
 }
 h1.date .dplus { font-size: 13px; font-weight: 600; color: var(--faint); margin-left: 8px; letter-spacing: .05em; }
+/* 날짜 줄 — 왼쪽 날짜, 오른쪽 전날/다음날. 좁은 폭(320)에선 버튼이 다음 줄로 내려간다 */
+.date-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; margin-top: 8px; }
+.date-row h1.date { margin-top: 0; }
+.day-nav { display: flex; gap: 6px; }
+.btn.nav-btn { flex: 0 0 44px; min-height: 40px; font-size: 11px; color: var(--muted); }
+.btn.nav-btn:disabled { opacity: .3; cursor: default; }
+.edit-notice {
+  display: none; margin-top: 12px; padding: 9px 9px 9px 13px;
+  background: var(--brass-dim); border: 1px solid rgba(217,164,65,.5); border-radius: 10px;
+  font-size: 12px; line-height: 1.5; color: var(--brass);
+  align-items: center; justify-content: space-between; gap: 10px;
+}
+.edit-notice.show { display: flex; }
+.edit-notice .btn {
+  flex: 0 0 auto; min-height: 36px; padding: 0 14px;
+  font-family: 'IBM Plex Sans KR', sans-serif; font-size: 12px; color: var(--brass); border-color: rgba(217,164,65,.5);
+}
 .chips { display:flex; gap:8px; margin-top: 12px; }
 .chip {
   background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
@@ -127,11 +144,13 @@ h1.date .dplus { font-size: 13px; font-weight: 600; color: var(--faint); margin-
 .weekly-card.review-missed { border-color: rgba(91,141,239,.55); }
 .weekly-status { margin-top: 11px; font-size: 12px; line-height: 1.55; color: var(--muted); }
 .weekly-btn { font-family: 'IBM Plex Sans KR', sans-serif; font-size: 13px; }
+.weekly-link { color: var(--brass); text-decoration: none; border-bottom: 1px solid rgba(217,164,65,.5); white-space: nowrap; }
 .weekly-btn:disabled { color: var(--faint); opacity: .65; cursor: default; }
 
 /* ---------- 14-day strip ---------- */
 .reflection-card { margin-top: 18px; border-color: rgba(217,164,65,.45); }
 .reflection-question { font-size: 18px; line-height: 1.65; font-weight: 600; word-break: keep-all; }
+.reflection-motto { margin-top: 5px; font-size: 12px; color: var(--muted); letter-spacing: .02em; }
 .reflection-choices .btn { min-height: 54px; font-size: 24px; }
 .reflection-label { display: block; margin-top: 16px; font-size: 13px; color: var(--muted); }
 .reflection-reason, .reminder-connect input {
@@ -193,7 +212,15 @@ h1.date .dplus { font-size: 13px; font-weight: 600; color: var(--faint); margin-
   background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
   padding: 14px 12px 10px;
 }
-.day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.day {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  /* 버튼 — 누르면 그날 기록 수정. 기본 버튼 꾸밈은 지운다 */
+  background: none; border: none; padding: 0; min-width: 0; color: inherit; font: inherit; cursor: pointer;
+}
+.day:disabled { cursor: default; }
+.day:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 4px; }
+.day.selected .candle { outline: 1.5px solid var(--brass); outline-offset: 1.5px; }
+.day.selected .day-label { color: var(--brass); font-weight: 700; }
 .candle-slot { height: 44px; width: 100%; max-width: 16px; display: flex; align-items: flex-end; }
 .candle { width: 100%; border-radius: 3px; min-height: 3px; background: var(--surface2); }
 .candle.full { background: var(--red); }

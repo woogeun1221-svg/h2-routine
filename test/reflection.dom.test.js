@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderReflection, renderReflectionHistory, renderReflectionArchive, REFLECTION_QUESTION } from '../src/views/reflection.js';
+import {
+  renderReflection, renderReflectionHistory, renderReflectionArchive, REFLECTION_QUESTION, REFLECTION_MOTTO
+} from '../src/views/reflection.js';
 import { importText, exportText, validateState } from '../src/storage.js';
 import { statusOf, todayStr } from '../src/logic.js';
 
@@ -18,6 +20,10 @@ describe('하루 만족도', () => {
     const state = { startDate: day, days: { [day]: full } };
     renderReflection(state, day, handlers);
     expect(document.querySelector('h2').textContent).toBe(REFLECTION_QUESTION);
+    expect(REFLECTION_QUESTION).toBe('스스로에게 만족할만한 하루를 보냈는가?');
+    expect(document.querySelector('.reflection-motto').textContent).toBe(REFLECTION_MOTTO);
+    expect(REFLECTION_MOTTO).toBe('컨트롤 할 수 있는 건 오로지 나뿐');
+    expect(document.getElementById('reminderStatus')).not.toBeNull();
     expect(document.querySelectorAll('[aria-pressed="false"]').length).toBe(2);
     expect(document.querySelector('textarea')).toBeNull();
     document.querySelector('[aria-label="X 만족하지 못했다"]').click();
@@ -39,8 +45,8 @@ describe('하루 만족도', () => {
   });
 
   it('O/X·이유는 백업 왕복을 보존하고 기존 달성 판정은 바꾸지 않는다', () => {
-    const state = { startDate: day, investmentReviewStart: day, pullupStart: day,
-      days: { [day]: { ...full, t: 20, self: 'x', selfReason: '핵심 일을 미룸' } } }; // 활성일 당일이라 턱걸이도 필요
+    const state = { startDate: day, investmentReviewStart: day, rrSnapshotStart: day, pullupStart: day, squatEnd: day,
+      days: { [day]: { ...full, t: 20, self: 'x', selfReason: '핵심 일을 미룸' } } }; // 활성일 당일이라 턱걸이도 필요, 스쿼트는 제외
     expect(importText(exportText(state), day)).toEqual(state);
     expect(statusOf(state, day)).toBe('full');
     expect(validateState({ ...state, days: { [day]: { self: true } } })).toContain('.self');
@@ -93,6 +99,16 @@ describe('하루 만족도', () => {
     expect(document.querySelector('.archive-more').hidden).toBe(true);
     document.querySelector('.archive-export').click();
     expect(exportArchive).toHaveBeenCalledOnce();
+  });
+
+  it('과거 날짜 수정 중에는 오늘 응답 전달 문구 대신 그날 날짜를 보여 주고 O/X는 그날에 쓴다', () => {
+    const state = { startDate: '2026-09-01', days: { '2026-09-10': { self: 'o' } } };
+    renderReflection(state, '2026-09-10', handlers, false);
+    expect(document.getElementById('reminderStatus')).toBeNull();
+    expect(document.querySelector('.reflection-footer span').textContent).toBe('2026.09.10 응답');
+    expect(document.querySelector('[aria-label="O 만족했다"]').getAttribute('aria-pressed')).toBe('true');
+    document.querySelector('[aria-label="X 만족하지 못했다"]').click();
+    expect(handlers.setReflection).toHaveBeenCalledWith('2026-09-10', 'x');
   });
 
   it('한국 자정에 날짜가 바뀐다', () => {

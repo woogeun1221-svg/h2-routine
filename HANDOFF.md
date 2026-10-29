@@ -1,3 +1,55 @@
+# 스쿼트 은퇴, 푸쉬업 단계, 만족도 문구, 과거 날짜 수정, 손익비 스냅샷 — 2026-10-29
+
+## 현재 작업
+
+사용자 요청: 스쿼트 항목 삭제, "스스로에게 만족할만한 하루를 보냈는가? (컨트롤 할 수 있는 건 오로지 나뿐)" 추가,
+과거 날짜 수치 수정, 푸쉬업 단계 +5 +10 +25. 보고 후 추가 요청: 주 1회 손익비 스냅샷을 투자 원칙과 별도 항목으로, 그리고 끝까지(커밋, 배포) 진행.
+
+- 손익비 스냅샷: 주간 항목을 `WEEKLIES = [INVESTMENT_REVIEW, RR_SNAPSHOT]` 데이터로 일반화. `weeklyStatus(state, ds, item)`가 공통 판정이고
+  `investmentReviewStatus`는 호환 래퍼. `statusOf`, `completion`은 금요일에 활성 주간 항목마다 각각 건다(둘 다 활성이면 분모 +2).
+  `habitMonthStats`가 `weeklies` 배열(투자 원칙, 손익비 순)을 돌려주고 `investment`는 호환용으로 남김. 추이 표는 `habits.concat(weeklies)`.
+  `storage.js`가 주간 키(i, rr)를 boolean으로 검증하고 `rrSnapshotStart`를 START_KEYS로 채움. `main.js` `toggleWeekly(key)`가 `toggleInvestmentReview`를 대체.
+  오늘 카드는 `renderWeeklyCard(item)`로 두 장, `data-weekly` 속성, 손익비 카드엔 대시보드 링크(`RR_SNAPSHOT.link`, /rr/ 슬래시 포함, 새 탭).
+  문구는 item 필드(action, upcoming, open, statName) — 투자 원칙 문구는 기존 그대로, 새 항목 문구엔 가운뎃점 없음.
+  결정(사용자 미확인): 마감은 투자 원칙과 같은 금요일. 폰에서 처음 여는 날이 `rrSnapshotStart`라 그 주 금요일부터 스냅샷 없으면 미달.
+
+- 스쿼트: `HABITS`에서 지우지 않고 `endKey: 'squatEnd'`로 은퇴. `goalsOf(state, ds)`가 `ds >= squatEnd`면 제외, 날짜 없이(설정) 부르면 은퇴 습관 제외.
+  지우면 `settings.s`가 `validateSettings`에서 거부돼 기록 전체가 fresh로 떨어지고(10-19 `settings.t` 때 거의 밟은 함정), 과거 날의 판정이 소급해 바뀐다.
+  `squatEnd`는 `storage.js` START_KEYS에 합류 — load/import 때 없으면 오늘, `freshState`도 포함. 처음 연 날이 종료일(배포일 아님).
+  `habitSpans(state)`(신규)가 은퇴 포함 전부를 돌려주고 `habitMonthStats`가 이걸 써서 종료일 전 표본만 세고 표본 0인 은퇴 행은 지운다.
+  `resetGoals` 확인문은 활성 습관만. `ensureDay`의 `s: 0` 기본값은 그대로 두었다(무해, 스키마 호환).
+- 만족도: 기존 맨 위 카드(`REFLECTION_QUESTION`) 문구를 "가슴에 손을 얹고 …" → "스스로에게 만족할만한 하루를 보냈는가?"로 바꾸고
+  `REFLECTION_MOTTO` "컨트롤 할 수 있는 건 오로지 나뿐"을 질문 밑 한 줄로 추가. 추이의 만족도 섹션 제목, 부제도 같은 상수.
+  **판정(`statusOf`)에는 넣지 않았다** — 같은 질문이 이미 있어 문구 교체로 해석했고, X를 그날 미달로 치는 건 사용자가 원하면 활성일 규칙으로 추가.
+- 과거 날짜 수정: `main.js`에 `viewDate`(null=오늘) + `targetDay()` + `selectDay(ds)`(시작일~오늘로 클램프, undoStack 비움).
+  addVal, undoVal, setDirect, toggleW, toggleInvestmentReview가 `targetDay()`에 쓴다. `renderToday(state, t, h, day)`:
+  날짜, D+, 카드, 송은, 투자 원칙, 만족도는 `day` 기준, 연속 생존, 이달 정상, 배너는 `t` 기준. `index.html`에 `.date-row`(h1 + ◀ ▶ `#dayPrev` `#dayNext`),
+  `#editNotice`(+ `#todayBtn`). 14일 스트립 칸은 `<button class="day">`(시작일 전 disabled), 선택 중이면 `.selected`.
+  `renderReflection(…, isToday)`가 false면 `#reminderStatus` 대신 그날 날짜 표시(그 줄은 오늘 이야기라서). 롤오버 두 경로, 가져오기, 초기화에서 `viewDate = null`.
+- 푸쉬업 `steps: [5, 10, 25]`.
+- 글쓰기 규칙: 새로 넣은 한국어 문구에는 가운뎃점을 쓰지 않았다. 기존 `join('·')` 숫자 구분자와 테스트 단언은 그대로.
+
+## 검증
+
+- `npm test`: 27 files / 282 tests 통과(기존 249 + `test/squat-retire.test.js` 14 + `test/rr-snapshot.test.js` 11 + today.dom 4 + settings.dom 1 + trends.dom 2 + reflection.dom 1,
+  기존 테스트는 픽스처만 갱신). 픽스처 갱신: storage, pullup, reflection.dom이 load/import/freshState의 `squatEnd`, `rrSnapshotStart` 채움에 맞춤.
+  today.dom 골격에 새 id 추가, 핸들러 `toggleInvestmentReview` → `toggleWeekly`, 카드 수 +1(손익비).
+  squatEnd 없는 옛 픽스처(logic, trends-logic, settings-logic)는 무수정 통과 = 소급 없음의 증거.
+- `npm run typecheck`, `npm run build` 통과.
+- `node scripts/browser_qa.cjs`: 390/320/1200 가로 넘침 0, 브라우저 오류 0. 오늘 카드 6개(푸쉬업, 턱걸이, 독서, 송은, 투자 원칙, 손익비 스냅샷), 푸쉬업 버튼 +5 +10 +25.
+  손익비 카드: 완료 → `rr: true` 저장, 투자 원칙 aria-pressed 불변, 취소 → 삭제, 링크 target _blank.
+  ◀ 로 어제: 안내 표시, 어제 카드에 스쿼트(은퇴 전) 있고 턱걸이 없음, +5/+50이 어제 기록에만 쓰임(오늘 p 30 유지), 스트립 칸 왕복, '오늘로' 복귀.
+  시드에 `squatEnd: 오늘`, `rrSnapshotStart: 오늘`. 라이브 스모크 단언은 새 질문 문구, 모토, 카드 6개로 갱신(배포 후 실행).
+  화면: `/private/tmp/h2-routine-qa/today-390.png`, `today-past-390.png`, `today-320.png`. 320에서 ◀ ▶ 는 날짜 아래 줄로 내려간다.
+- 폰에서 업데이트된 앱을 처음 여는 날이 `squatEnd`가 된다. 그날부터 스쿼트 없이 정상/최소 판정. 그 전 날짜로 돌아가 수정하면 스쿼트 카드가 다시 보인다(그날 기준이라 정상).
+
+## 배포
+
+- 미실행. 승인 후 `git add -A && git commit` → `npm run deploy`(테스트, 빌드 후 gh-pages 강제 푸시) → `node scripts/browser_qa.cjs --live-smoke`.
+- 헬스 탭 하체 프로그램의 스쿼트(`ironterminal:v1`)는 손대지 않았다.
+
+---
+
 # 턱걸이 20회 추가 — 2026-10-19
 
 ## 현재 작업

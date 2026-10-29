@@ -94,12 +94,16 @@ describe('habitMonthStats — 턱걸이 행은 활성일부터만 센다', () =>
 
 describe('저장 스키마 — pullupStart, t, settings.t', () => {
   it('freshState에 pullupStart', () => {
-    expect(freshState('2026-10-19')).toEqual({ startDate: '2026-10-19', investmentReviewStart: '2026-10-19', pullupStart: '2026-10-19', days: {} });
+    expect(freshState('2026-10-19')).toEqual({
+      startDate: '2026-10-19', investmentReviewStart: '2026-10-19', rrSnapshotStart: '2026-10-19',
+      pullupStart: '2026-10-19', squatEnd: '2026-10-19', days: {}
+    });
   });
   it('옛 백업 가져오기: pullupStart를 오늘로 채우고 기록은 그대로', () => {
     const old = { startDate: '2026-06-29', investmentReviewStart: '2026-08-19', days: { '2026-06-29': FULL3 } };
     const s = importText(JSON.stringify(old), START);
     expect(s.pullupStart).toBe(START);
+    expect(s.squatEnd).toBe(START);
     expect(s.investmentReviewStart).toBe('2026-08-19');
     expect(s.days).toEqual(old.days);
     expect(statusOf(s, '2026-06-29')).toBe('full');
