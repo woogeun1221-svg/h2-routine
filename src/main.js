@@ -7,12 +7,13 @@ import '@fontsource/ibm-plex-mono/600.css';
 import '@fontsource/ibm-plex-mono/700.css';
 import './styles.css';
 import { registerSW } from 'virtual:pwa-register';
-import { HABITS, WEEKLIES, goalsOf, todayStr, getDay, shift, monthList, shiftMonth, weeklyStatus } from './logic.js';
+import { HABITS, WEEKLIES, goalsOf, todayStr, getDay, shift, monthList, shiftMonth, weeklyStatus, statusOf } from './logic.js';
 import { load, save as persist, exportText, importText, freshState } from './storage.js';
 import { renderToday } from './views/today.js';
 import { renderTrends } from './views/trends.js';
 import { renderSettings } from './views/settings.js';
-import { createReminderClient, reminderStatusText } from './reminders.js';
+import { createReminderClient, reminderStatusText, parseConnectCode } from './reminders.js';
+import { createPushClient, pushStatusText } from './push.js';
 import { reflectionArchiveText } from './reflection.js';
 
 /* 새 배포 감지: 로드 시 1회 + 앱 재개(resume)마다 체크 — iOS standalone은
@@ -37,6 +38,15 @@ var trendYm = null;            // 추이 화면에서 보고 있는 달 — 진�
 var calendarMode = 'self';
 var archiveFilters = { month: 'all', query: '', limit: 20 };
 var reminders = createReminderClient({ onStatus: renderReminderStatus });
+/* 앱 푸시 알림 — 구독 등록은 reminders 의 기기 인증으로. SW 등록은 registerSW 가 준 것을 우선 쓴다. */
+var push = createPushClient({
+  reminders: reminders,
+  getRegistration: function () {
+    if (swRegistration) return Promise.resolve(swRegistration);
+    return navigator.serviceWorker.ready;
+  },
+  onStatus: renderPushControls
+});
 
 function renderReminderStatus() {
   if (!reminders) return;
@@ -47,9 +57,32 @@ function renderReminderStatus() {
     if (el) el.textContent = text;
   });
 }
+/* 설정 화면의 알림 상태와 버튼 — 연결 전 홈 화면 앱이면 연결 버튼 하나로 권한, 구독, 연결을 끝낸다 */
+function renderPushControls() {
+  if (!push) return;
+  var connected = reminders.isConnected();
+  var status = push.getStatus();
+  var text = document.getElementById('pushStatus');
+  if (text) text.textContent = pushStatusText(status, connected);
+  var connectBtn = document.getElementById('reminderConnectBtn');
+  if (connectBtn) connectBtn.textContent = (!connected && status === 'off') ? '연결하고 알림 켜기' : '이 기기 연결';
+  var enableBtn = document.getElementById('pushEnableBtn');
+  if (enableBtn) enableBtn.style.display = (connected && status === 'off') ? '' : 'none';
+  var disableBtn = document.getElementById('pushDisableBtn');
+  if (disableBtn) disableBtn.style.display = status === 'enabled' ? '' : 'none';
+}
+function clearBadge() {
+  if (navigator.clearAppBadge) navigator.clearAppBadge().catch(function () {});
+}
+/* 봇에는 오늘 날짜, 응답 여부, 루틴이 최소 포지션 이상인지만 보낸다 (밤 9시 알림은 미달일 때만) */
 function syncReflection() {
   var t = todayStr(), answer = getDay(state, t).self;
-  return reminders.enqueue(t, answer === 'o' || answer === 'x');
+  return reminders.enqueue(t, answer === 'o' || answer === 'x', statusOf(state, t) !== 'miss');
+}
+var syncTimer = null;
+function scheduleSync() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(function () { syncTimer = null; syncReflection(); }, 1500);
 }
 
 /* ---------- save ----------
@@ -68,6 +101,7 @@ function save() {
   } catch (e) {
     setSaveState('저장 실패 — 저장공간 확인', true);
   }
+  scheduleSync(); // 수치가 바뀌면 루틴 충족 여부도 알림 서버에 따라간다
 }
 
 /* ---------- mutations ----------
@@ -114,7 +148,7 @@ function toggleW(v) {
 function setReflection(day, answer) {
   ensureDay(day).self = answer;
   save(); render();
-  reminders.enqueue(day, answer === 'o' || answer === 'x');
+  reminders.enqueue(day, answer === 'o' || answer === 'x', statusOf(state, day) !== 'miss');
 }
 function setReflectionReason(day, reason) {
   ensureDay(day).selfReason = reason;
@@ -209,8 +243,10 @@ function render() {
     mountIronTab();
   } else {
     renderSettings(state, { setGoal: setGoal });
+    push.prefetch(); // 알림 켜기 탭 전에 서버 키를 받아 두면 권한 요청과 구독이 한 동작 안에 끝난다
   }
   renderReminderStatus();
+  renderPushControls();
 }
 
 document.querySelectorAll('.tabbar .tab').forEach(function (b) {
@@ -315,19 +351,33 @@ document.getElementById('resetBtn').addEventListener('click', function () {
 document.getElementById('reminderConnectForm').addEventListener('submit', async function (event) {
   event.preventDefault();
   var input = document.getElementById('reminderConnectCode');
-  var button = event.currentTarget.querySelector('button');
+  var button = document.getElementById('reminderConnectBtn');
   button.disabled = true;
   try {
-    await reminders.connect(input.value);
+    parseConnectCode(input.value); // 형식이 틀리면 권한 요청 전에 바로 알린다
+    // 연결 전 홈 화면 앱: 이 탭 한 번으로 알림 권한, 구독, 연결. 그 밖에는 연결만(메인컨트롤 봇이 알린다).
+    if (!reminders.isConnected() && push.getStatus() === 'off') await push.enable(input.value);
+    else await reminders.connect(input.value);
     input.value = '';
     await syncReflection();
   } catch (error) { alert(error.message); }
-  finally { button.disabled = false; }
+  finally { button.disabled = false; renderPushControls(); }
+});
+document.getElementById('pushEnableBtn').addEventListener('click', function () {
+  push.enable(null).catch(function (error) { alert(error.message); });
+});
+document.getElementById('pushDisableBtn').addEventListener('click', function () {
+  push.disable().catch(function (error) { alert(error.message); });
 });
 
 /* ---------- day rollover + resume 시 SW 갱신 체크 ---------- */
 document.addEventListener('visibilitychange', function () {
-  if (document.visibilityState !== 'visible') return;
+  if (document.visibilityState !== 'visible') {
+    // 앱을 닫기 직전 — 미뤄 둔 루틴 충족 여부를 바로 보낸다(요청은 keepalive)
+    if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; syncReflection(); }
+    return;
+  }
+  clearBadge();
   if (swRegistration) swRegistration.update().catch(function () {});
   if (renderedDate && renderedDate !== todayStr()) {
     undoStack = emptyUndo(); viewDate = null;
@@ -363,6 +413,8 @@ if (connectionCode || ironTransfer) {
 if (connectionCode) {
   reminders.connect(connectionCode).then(syncReflection).catch(function (error) { alert(error.message); });
 } else syncReflection();
+clearBadge();
+push.resync().catch(function () {});
 if (ironTransfer) {
   /* 예전 Iron(/iron/) '새 앱으로 이동' — Safari 탭/데스크톱 경로. 홈 화면 PWA 는 저장소가 분리돼
      여기로 못 오므로 그쪽은 설정의 '이사 코드 붙여넣기'를 쓴다. */

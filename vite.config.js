@@ -38,6 +38,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        /* 푸시 알림 핸들러(public/push-sw.js)를 생성된 sw.js 가 importScripts 로 불러온다 */
+        importScripts: ['push-sw.js'],
         /* 한글 폰트는 unicode-range 서브셋이 수백 개라 프리캐시 대신 런타임 캐시 —
            첫 렌더에 쓰인 서브셋부터 캐시되므로 평소 쓰는 화면은 오프라인에서 폰트까지 동일 */
         runtimeCaching: [

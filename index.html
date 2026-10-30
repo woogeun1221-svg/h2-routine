@@ -139,14 +139,19 @@
     <!-- ================= 설정 ================= -->
     <div id="screen-settings" style="display:none">
       <div class="settings-section">
-        <div class="strip-head"><span class="strip-title">메인컨트롤 알림</span></div>
-        <p class="settings-note">매일 밤 11시(한국 시간), 하루 만족도 미응답 시 한 번 재촉합니다.</p>
+        <div class="strip-head"><span class="strip-title">알림</span></div>
+        <p class="settings-note">밤 9시에 오늘 루틴이 아직 미달이면, 밤 11시에 하루 만족도가 미응답이면 한 번씩 알립니다. 홈 화면 앱에서 알림을 켜면 이 기기로 오고, 켜지 않으면 메인컨트롤 봇이 대신 알립니다.</p>
+        <p id="pushStatus" class="settings-note" role="status"></p>
         <p id="reminderSettingsStatus" class="settings-note" role="status"></p>
         <form id="reminderConnectForm" class="reminder-connect">
           <label for="reminderConnectCode">봇이 보낸 연결 링크 또는 코드</label>
           <input id="reminderConnectCode" type="password" autocomplete="off" spellcheck="false">
-          <button class="btn" type="submit">이 기기 연결</button>
+          <button class="btn" type="submit" id="reminderConnectBtn">이 기기 연결</button>
         </form>
+        <div class="settings-btns">
+          <button class="btn" id="pushEnableBtn" style="display:none">이 기기 알림 켜기</button>
+          <button class="btn" id="pushDisableBtn" style="display:none">이 기기 알림 끄기</button>
+        </div>
       </div>
       <div class="settings-section">
         <div class="strip-head">

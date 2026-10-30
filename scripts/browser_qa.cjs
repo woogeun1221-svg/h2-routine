@@ -8,6 +8,7 @@ const path = require('node:path');
 const dist = path.resolve(__dirname, '../dist');
 const report = '/private/tmp/h2-routine-qa';
 const api = 'https://macmini.taile484c7.ts.net/routine-api';
+const vapidKey = 'BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8';
 const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
 const oldRecord = { p: 100, s: 30, r: 20, w: 'o', i: true, self: 'x', selfReason: '오래된 사유도 아카이브에 남는다.' };
 // 선택 월 O 비율 50% 기대: 이번 달 1일 O + 오늘 X. 9월 고정 날짜는 달이 바뀌면 0%가 돼 깨졌다(2026-10-13).
@@ -67,6 +68,9 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.locator('#screen-iron .iron-subnav .iron-subnav-item').count(), 5);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       await page.screenshot({ path: path.join(report, 'production-iron-390.png'), fullPage: true });
+      await page.locator('[data-tab="settings"]').click();
+      assert.equal(await page.locator('#reminderConnectBtn').count(), 1);
+      assert.equal(await page.locator('#pushStatus').count(), 1);
       await page.locator('[data-tab="trends"]').click();
       assert.deepEqual(errors, []);
       await page.screenshot({ path: path.join(report, 'production-trends-390.png'), fullPage: true });
@@ -77,13 +81,53 @@ const server = http.createServer((req, res) => {
     await page.addInitScript(data => {
       if (!localStorage.getItem('h2-routine-v1')) localStorage.setItem('h2-routine-v1', JSON.stringify(data));
     }, seed);
+    // 푸시 알림: SW 는 차단돼 있으므로 등록 객체와 Notification 을 가짜로 끼운다(권한 요청은 승인, 구독은 고정 엔드포인트).
+    await page.addInitScript(() => {
+      const state = { permissionRequests: 0, subscription: null, unsubscribed: 0 };
+      window.__qaPush = state;
+      const makeSubscription = key => ({
+        endpoint: 'https://web.push.apple.com/qa-endpoint', options: { applicationServerKey: key.buffer },
+        toJSON: () => ({ endpoint: 'https://web.push.apple.com/qa-endpoint', keys: { p256dh: 'B' + 'q'.repeat(86), auth: 'a'.repeat(22) } }),
+        unsubscribe: async () => { state.unsubscribed++; state.subscription = null; return true; }
+      });
+      const registration = {
+        scope: location.origin + '/h2-routine/',
+        pushManager: {
+          getSubscription: async () => state.subscription,
+          subscribe: async options => { state.subscription = makeSubscription(options.applicationServerKey); return state.subscription; }
+        }
+      };
+      Object.defineProperty(navigator.serviceWorker, 'ready', { get: () => Promise.resolve(registration) });
+      const FakeNotification = function () {};
+      FakeNotification.permission = 'default';
+      FakeNotification.requestPermission = async () => { state.permissionRequests++; FakeNotification.permission = 'granted'; return 'granted'; };
+      window.Notification = FakeNotification;
+    });
     await page.route(api + '/**', async route => {
+      const url = route.request().url();
+      if (route.request().method() === 'GET') {
+        assert(url.endsWith('/push/key'));
+        await route.fulfill({ json: { key: vapidKey } });
+        return;
+      }
       const body = route.request().postDataJSON();
-      if (route.request().url().endsWith('/pair')) {
-        assert.deepEqual(Object.keys(body), ['code']);
+      if (url.endsWith('/pair')) {
+        assert.deepEqual(Object.keys(body).sort(), ['code', 'subscription']);
+        assert.equal(body.subscription.endpoint, 'https://web.push.apple.com/qa-endpoint');
+        sent.push({ pair: true });
         await route.fulfill({ json: { token: 'qa-device-token' } });
+      } else if (url.endsWith('/push/unsubscribe')) {
+        assert.deepEqual(body, { endpoint: 'https://web.push.apple.com/qa-endpoint' });
+        sent.push({ unsubscribe: true });
+        await route.fulfill({ json: { ok: true } });
+      } else if (url.endsWith('/push/subscribe')) {
+        assert.equal(body.subscription.endpoint, 'https://web.push.apple.com/qa-endpoint');
+        sent.push({ subscribe: true });
+        await route.fulfill({ json: { ok: true } });
       } else {
-        assert.deepEqual(Object.keys(body).sort(), ['answered', 'day']);
+        assert(url.endsWith('/answer'));
+        assert.deepEqual(Object.keys(body).sort(), ['answered', 'day', 'routine']);
+        assert.equal(typeof body.routine, 'boolean');
         sent.push(body);
         await route.fulfill({ json: { ok: true } });
       }
@@ -139,10 +183,30 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.locator('#routineStreaks').isVisible(), false);
 
     await page.locator('[data-tab="settings"]').click();
+    // 연결 전 + 푸시 지원 → 버튼 하나로 권한 요청, 구독, 연결(구독 동봉)까지. 켜짐 상태와 끄기까지 확인.
+    assert.equal(await page.locator('#reminderConnectBtn').textContent(), '연결하고 알림 켜기');
+    assert((await page.locator('#pushStatus').textContent()).includes('연결하면 이 기기로 앱 알림'));
+    assert.equal(await page.locator('#pushEnableBtn').isVisible(), false);
     await page.locator('#reminderConnectCode').fill('https://woogeun1221-svg.github.io/h2-routine/#reminder=' + 'a'.repeat(43));
-    await page.getByRole('button', { name: '이 기기 연결', exact: true }).click();
+    await page.getByRole('button', { name: '연결하고 알림 켜기', exact: true }).click();
     await page.waitForFunction(() => document.getElementById('reminderSettingsStatus').textContent.includes('응답 전달됨'));
-    assert.deepEqual(sent.at(-1), { day: date, answered: true });
+    await page.waitForFunction(() => document.getElementById('pushStatus').textContent.includes('이 기기로 앱 알림이 옵니다'));
+    assert.equal(await page.evaluate(() => window.__qaPush.permissionRequests), 1);
+    assert.equal(await page.evaluate(() => localStorage.getItem('h2-routine-push-endpoint')), 'https://web.push.apple.com/qa-endpoint');
+    assert(sent.some(entry => entry.pair));
+    assert.deepEqual(sent.filter(entry => entry.day).at(-1), { day: date, answered: true, routine: sent.filter(entry => entry.day).at(-1).routine });
+    assert.equal(await page.locator('#reminderConnectBtn').textContent(), '이 기기 연결');
+    assert.equal(await page.locator('#pushDisableBtn').isVisible(), true);
+    await page.locator('#pushDisableBtn').click();
+    await page.waitForFunction(() => document.getElementById('pushStatus').textContent.includes('꺼짐'));
+    assert.equal(await page.evaluate(() => window.__qaPush.unsubscribed), 1);
+    assert(sent.some(entry => entry.unsubscribe));
+    assert.equal(await page.locator('#pushEnableBtn').isVisible(), true);
+    await page.locator('#pushEnableBtn').click();
+    await page.waitForFunction(() => document.getElementById('pushStatus').textContent.includes('이 기기로 앱 알림이 옵니다'));
+    assert(sent.some(entry => entry.subscribe));
+    assert.equal(await page.locator('#pushEnableBtn').isVisible(), false);
+    await page.screenshot({ path: path.join(report, 'settings-390.png'), fullPage: true });
     const [backupDownload] = await Promise.all([
       page.waitForEvent('download'), page.getByRole('button', { name: '백업 파일로 내보내기', exact: true }).click()
     ]);
@@ -152,7 +216,7 @@ const server = http.createServer((req, res) => {
     await page.locator('[data-tab="today"]').click();
     await page.getByRole('button', { name: '선택 취소', exact: true }).click();
     await page.waitForFunction(() => document.getElementById('reminderStatus').textContent.includes('미응답이면'));
-    assert.deepEqual(sent.at(-1), { day: date, answered: false });
+    assert.equal(sent.filter(entry => entry.day).at(-1).answered, false);
     await page.getByRole('button', { name: 'X 만족하지 못했다', exact: true }).click();
     await page.waitForFunction(() => document.getElementById('reminderStatus').textContent.includes('응답 전달됨'));
 
@@ -256,7 +320,7 @@ const server = http.createServer((req, res) => {
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ passed: true, widths: [390, 320, 1200], browserErrors: errors.length,
       legacyRecordsPreserved: true, reasonReloaded: true, crossMonthArchiveAndDownloads: true, ironTabMounted: true,
-      pastDayEdit: true, squatRetired: true, rrSnapshotWeekly: true, apiMocked: true, screenshots: report }));
+      pastDayEdit: true, squatRetired: true, rrSnapshotWeekly: true, pushSubscribeFlow: true, apiMocked: true, screenshots: report }));
   } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));

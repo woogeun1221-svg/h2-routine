@@ -25,6 +25,38 @@
 - 데이터는 기기 localStorage에만 저장 — 서버 없음. 백업은 [데이터 내보내기] JSON.
 - `h2-routine-tracker.html` = v1 프로토타입 (Claude.ai 아티팩트용, 참조 보존)
 
+## 알림 (앱 푸시 2026-10-30 추가, 메인컨트롤 봇 2026-09-17)
+
+종류는 둘, 한국 시간, 어느 기기도 충족을 보고하지 않았을 때만 하루 한 번.
+
+- 밤 9시 루틴 미달: 오늘 판정이 미달(`statusOf` = miss, 금요일엔 주간 항목 포함)이면. 금요일엔 투자 원칙 검토와 손익비 스냅샷 마감 문구가 붙는다.
+- 밤 11시 만족도 미응답: 하루 만족도 O/X를 안 골랐으면.
+
+전달 경로: 연결된 기기에 푸시 구독이 하나라도 있으면 Web Push(iOS 16.4 이상 홈 화면 앱, 데스크톱 브라우저), 구독이 없거나 전부 실패하면
+메인컨트롤 봇 DM(기존 `../_core/tg-notify`). 404, 410으로 끊긴 구독은 지운다. 429나 네트워크 오류는 구독을 남기고 봇으로 넘어간다.
+
+연결은 폰에서 한 번: `python3 scripts/reminder_service.py pair`가 7일짜리 일회용 코드를 메인컨트롤 DM으로 보낸다.
+홈 화면 H2 루틴 앱 → 설정 → 알림 칸에 붙여넣고 **연결하고 알림 켜기** 한 번(알림 권한 요청, 구독, 연결을 같이 한다).
+Safari 탭이나 알림 미지원 브라우저에선 연결만 되고 봇이 알린다. 이미 연결된 기기는 **이 기기 알림 켜기 / 끄기**. 권한을 거부했으면 iOS 설정의 알림에서 허용한 뒤 다시 켠다.
+
+앱이 서버에 보내는 것: 날짜, 만족도 응답 여부, 루틴이 최소 포지션 이상인지(둘 다 불리언), 브라우저가 만든 푸시 구독(엔드포인트, 공개키, 인증 비밀).
+O/X 값, 사유, 운동 수치는 보내지 않는다. 수치가 바뀌면 1.5초 뒤, 앱을 숨길 때, 화면이 켜진 동안 1분마다 동기화한다.
+
+- 클라이언트: `src/push.js`(구독, 상태 문구), `src/reminders.js`(연결, 보고 큐), `public/push-sw.js`(푸시 수신과 알림 표시, 앱 배지).
+  생성된 `dist/sw.js`가 `importScripts('push-sw.js')`로 불러온다(`vite.config.js` workbox.importScripts). 앱을 열면 배지를 지운다.
+- 서버: `scripts/reminder_service.py serve`(localhost:8815, Funnel `/routine-api`). `GET /push/key`, `POST /pair {code, subscription?}`,
+  `POST /answer {day, answered, routine?}`, `POST /push/subscribe {subscription}`, `POST /push/unsubscribe {endpoint}`(마지막 셋은 Bearer 기기 인증).
+  DB `data/reminders.sqlite3`(git 제외, 0600): `subscriptions`, `answers.routine`, `reminders(day, kind)`. 2026-09 스키마는 열 때 자동 이행.
+- 발송기: `scripts/web_push.cjs`. 외부 패키지 없이 Node 내장 crypto로 RFC 8291(aes128gcm)과 RFC 8292(VAPID ES256)를 구현했고
+  `test/web-push.test.js`가 RFC 8291 검증 벡터와 바이트 단위로 비교한다. VAPID 키는 `data/vapid.json`(0600), 서비스가 처음 뜰 때 `keygen`으로 만든다.
+  Node는 `/opt/homebrew/bin/node` 절대경로(launchd의 PATH에 homebrew가 없다).
+  **`data/vapid.json`은 지우거나 다시 만들지 않는다.** 이 키가 바뀌면 기존 구독 전부가 403으로 실패하고(404, 410이 아니라 정리도 안 된다) 매일 봇 폴백으로만 간다.
+  잃어버렸다면 폰에서 알림 끄기 뒤 켜기로 새 키에 다시 구독해야 한다.
+- launchd `com.woogeun.routine.reminder`: 21:00과 23:00에 `remind`(시각으로 종류를 정한다. `--kind routine|reflection`, `--dry-run`).
+  `status`는 기기 수, 오늘 보고, 구독 수. `push-test`는 연결된 구독 전부에 확인 알림을 보낸다.
+- iOS 주의: 알림은 홈 화면에 추가한 앱에서만 켤 수 있고, 권한 요청은 탭 핸들러 안에서만 열린다. 모든 푸시는 알림을 띄운다(조용한 푸시가 쌓이면 iOS가 구독을 끊는다).
+  앱을 홈 화면에서 지우면 구독도 사라진다(다음 발송 때 410으로 정리).
+
 ## 헬스 탭 (Iron Terminal 통합, 2026-10-13)
 
 상체/하체 근력운동 트래커 Iron Terminal(React 19 + TypeScript)을 `헬스` 탭으로 품었다.

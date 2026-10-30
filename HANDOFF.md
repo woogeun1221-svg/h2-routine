@@ -1,3 +1,53 @@
+# 앱 푸시 알림 — 2026-10-30
+
+## 현재 작업
+
+사용자 요청: "앱 알림을 설정해줄 수 있나?" 조사 결과 기존 밤 11시 메인컨트롤 봇 재촉은 2026-09-17 이후 한 번도 기기 연결이 안 됐다
+(`data/reminders.sqlite3` devices 0, 연결 코드 1건 만료, `logs/reminder.log` 매일 `not_paired`). 해석: 홈 화면 앱(iOS)의 Web Push 알림.
+코드와 로컬 검증까지 완료, 운영 반영은 승인 대기(아래).
+
+- 발송기 `scripts/web_push.cjs`(신규): 외부 패키지 없이 Node 내장 crypto로 RFC 8291 aes128gcm + RFC 8292 VAPID. `keygen`, `send --vapid FILE`(stdin JSON).
+  `test/web-push.test.js`가 RFC 8291 5절 본문과 바이트 비교(144바이트, RFC 예제 헤더의 Content-Length 145는 정오표), 복호화 왕복, JWT 서명 검증(ieee-p1363, aud, exp 12h), 410과 TimeoutError 보고.
+- 서비스 워커 `public/push-sw.js`(신규): push → showNotification(항상), setAppBadge(1); notificationclick → 열린 창 focus 또는 openWindow.
+  `vite.config.js` workbox.importScripts 로 생성 sw.js 가 로드. 빌드 확인: `dist/sw.js`에 `importScripts("push-sw.js")`, 프리캐시 목록에 push-sw.js(revision 포함이라 바꾸면 sw.js 가 갱신된다).
+- 클라이언트 `src/push.js`(신규): support(ok / not-standalone(iOS Safari 탭) / unsupported), getStatus(denied / working / enabled / off), enable(code)
+  = 권한 요청(탭 안) → `/push/key` → pushManager.subscribe(userVisibleOnly, 서버 키; 키가 바뀐 옛 구독은 풀고 새로) → code 있으면 `/pair`에 구독 동봉, 없으면 `/push/subscribe`.
+  disable, resync(앱 열 때 바뀐 구독 재등록, 사라진 구독은 켜짐 표시 해제), prefetch(설정 탭에서 키 선조회). 켜짐 표시는 localStorage `h2-routine-push-endpoint`.
+- `src/reminders.js`: `parseConnectCode` 분리, `connect(input, subscription?)`, `post(path, body)`(기기 인증), 큐 항목이 `{answered, routine}`(옛 boolean 큐는 로드 때 한 번 변환), fetch keepalive.
+  상태 문구에서 가운뎃점 제거, "밤 11시 메인컨트롤 봇이" → "밤 11시에"(푸시일 수도 있어서).
+- `src/main.js`: `push` 클라이언트(등록 객체는 registerSW 것 우선, 없으면 `navigator.serviceWorker.ready`), `renderPushControls`(상태 문구, 연결 버튼 라벨, 켜기/끄기 버튼 표시),
+  `syncReflection`이 `routine: statusOf(state, today) !== 'miss'`를 같이 보냄, `save()` 뒤 1.5초 디바운스 동기화 + 숨김 때 즉시, 앱 열면 배지 지움, 연결 폼은 미연결 + 푸시 가능이면 `push.enable(code)`.
+- `index.html` 설정: "메인컨트롤 알림" → "알림" 섹션, `#pushStatus`, `#reminderConnectBtn`(라벨 '연결하고 알림 켜기' / '이 기기 연결'), `#pushEnableBtn`, `#pushDisableBtn`.
+- 서버 `scripts/reminder_service.py`: 종류 `KINDS = {routine: 21, reflection: 23}`, `remind(kind=None)`은 시각으로 종류 결정(`outside_schedule`).
+  routine 은 어느 기기도 `routine=1`을 보고하지 않았을 때, reflection 은 기존 answered 규칙. `deliver`: 구독 있으면 푸시(2xx 하나면 sent/push, 404·410 구독 삭제), 없거나 전부 실패면 tg-notify.
+  DB: `subscriptions(endpoint PK, device, p256dh, auth, created)`, `answers.routine`(COALESCE 로 routine 생략 시 유지), `reminders(day, kind)` — 옛 스키마는 `migrate`가 보존 이행.
+  HTTP: `GET /push/key`, `POST /pair {code, subscription?}`(구독이 잘못되면 코드 소비 안 함), `/answer {day, answered, routine?}`, `/push/subscribe`, `/push/unsubscribe`(자기 기기 것만).
+  VAPID `data/vapid.json`(0600)은 `ensure_vapid`가 serve 시작과 발송 때 만든다. Node 는 `/opt/homebrew/bin/node` 후보 절대경로. CLI `push-test` 추가. `pair` 메시지 문구 갱신(코드 한 줄, 홈 화면 앱 안내).
+  텔레그램 문구도 새 질문("스스로에게 만족할만한 하루를 보냈는가?")으로 교체, 가운뎃점 제거.
+- `launchd/com.woogeun.routine.reminder.plist`(저장소 사본): StartCalendarInterval 을 21:00, 23:00 배열로. `~/Library/LaunchAgents` 설치본은 아직 23:00 하나(승인 대기).
+- 결정(사용자 미확인): 밤 9시 루틴 알림 추가와 그 시각, 최소 포지션 기준(미달일 때만), 금요일 문구, 푸시 우선 + 봇 폴백, 구독 등록에 기기 연결 요구(공개 엔드포인트에 아무나 구독 못 하게).
+- `data/vapid.json`은 발송자 신원이다. 지우거나 재생성하면 기존 구독이 403으로 실패하고 정리도 안 돼 매일 봇 폴백만 남는다. 잃으면 폰에서 알림 끄기 → 켜기.
+- 작동 중인 운영 서비스는 옛 코드로 돌고 있다. 오늘 밤 23:00 launchd `remind`는 작업 트리의 새 코드를 실행하지만 기기 0대라 `not_paired`로 끝난다(테스트로 확인).
+
+## 검증
+
+- `npm test`: 30 files / 299 tests(기존 282 + web-push 7 + push 7 + push-sw 3). `npm run typecheck`, `npm run build` 통과.
+- `PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m unittest discover -s scripts -p 'test_*.py'`: 18건(기존 8 + 10). 외부 발송은 mock, node keygen 은 실제 실행(0600, 87자 공개키).
+- `node scripts/browser_qa.cjs`: SW 차단 상태라 `navigator.serviceWorker.ready`와 `Notification`을 가짜로 주입. 설정에서 '연결하고 알림 켜기' 한 번 → 권한 요청 1회, `/pair`에 구독 동봉,
+  켜짐 문구, 끄기 → unsubscribe + `/push/unsubscribe`, 다시 켜기 → `/push/subscribe`. `/answer` 본문 키 `answered, day, routine`. 390/320/1200 가로 넘침 0, 브라우저 오류 0.
+  화면: `/private/tmp/h2-routine-qa/settings-390.png`.
+- 실제 푸시 서비스(Apple)로는 아직 한 번도 보내지 않았다. 폰에서 구독한 뒤 `python3 scripts/reminder_service.py push-test`로 확인해야 한다.
+
+## 운영 반영 (승인 대기, 이 순서로)
+
+1. `launchctl kickstart -k gui/$(id -u)/com.woogeun.routine.api` — 새 엔드포인트(`/push/key`, `/push/subscribe`)와 VAPID 키 생성.
+2. `npm run deploy`(gh-pages) + `git push origin main`.
+3. 저장소의 reminder plist를 `~/Library/LaunchAgents/`에 복사하고 bootout → bootstrap(21:00 추가).
+4. `python3 scripts/reminder_service.py pair` — 메인컨트롤 DM 으로 연결 코드 발송. 그다음은 폰에서 한 번: 홈 화면 앱 → 설정 → 알림 → 코드 붙여넣고 '연결하고 알림 켜기'.
+5. 구독 뒤 `push-test`로 실제 알림 확인, 라이브 스모크.
+
+---
+
 # 스쿼트 은퇴, 푸쉬업 단계, 만족도 문구, 과거 날짜 수정, 손익비 스냅샷 — 2026-10-29
 
 ## 현재 작업
