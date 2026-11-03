@@ -25,10 +25,13 @@
 - `npm test` 315건, `npm run build` 통과(문구 변경). 브라우저 QA 는 문구 단언이 없어 생략.
 - `plutil -lint` OK.
 
-## 운영 반영 (승인 대기)
+## 운영 반영 (2026-11-03 13:06~13:15, 사용자 "ok")
 
-1. reminder plist 교체(bootout → cp → bootstrap): 9시부터 23시까지 두 시간 간격. 이것 없이는 21시, 23시에만 돈다(코드는 두 시각을 그대로 지원).
-2. `npm run deploy` + `git push origin main`: 앱 안의 알림 안내 문구. 배포 직후 Pages CDN 이 몇 분간 옛 번들을 내보내므로 스모크 전에 서빙 번들 확인.
+0. 13:06 운영 DB 이행(`status` 실행): `reminders` 열 day, kind, slot, status, updated. 파일 0600 유지, `/health` ok, `remind --dry-run` → routine slot 13 would_send(bot false, 구독 1).
+1. reminder plist 교체(bootout → cp → bootstrap): 설치본이 저장소 사본과 동일, Hour 8개(9, 11, 13, 15, 17, 19, 21, 23). state not running(캘린더 작업 정상).
+2. `npm run deploy` → gh-pages a9b971c(deploy 38ca804), `git push origin main` fe9385a..38ca804.
+3. 라이브 스모크: 서빙 번들이 index-iaZW0064 로 바뀐 것(두 번째 폴링, 약 30초)을 확인한 뒤 실행, 통과(status 200, 브라우저 오류 0).
+4. 첫 두 시간 슬롯(15:00) 실제 발송 여부는 아래에 추가한다.
 
 ---
 
