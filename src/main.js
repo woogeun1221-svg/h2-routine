@@ -145,6 +145,13 @@ function toggleW(v) {
   ensureDay(t).w = (curW === v) ? null : v;
   save(); render();
 }
+/* 일간 체크 항목(가슴 펴기 c) O/X 토글 — 같은 값을 다시 누르면 미응답으로 돌아간다 */
+function toggleCheck(key, v) {
+  var t = targetDay();
+  var cur = getDay(state, t)[key] || null;
+  ensureDay(t)[key] = (cur === v) ? null : v;
+  save(); render();
+}
 function setReflection(day, answer) {
   ensureDay(day).self = answer;
   save(); render();
@@ -227,7 +234,7 @@ function render() {
   if (activeTab === 'today') {
     if (viewDate && viewDate > t) viewDate = null; // 시계가 뒤로 간 경우 방어
     renderToday(state, t, {
-      addVal: addVal, undoVal: undoVal, setDirect: setDirect, toggleW: toggleW,
+      addVal: addVal, undoVal: undoVal, setDirect: setDirect, toggleW: toggleW, toggleCheck: toggleCheck,
       setReflection: setReflection, setReflectionReason: setReflectionReason,
       toggleWeekly: toggleWeekly, selectDay: selectDay, undoStack: undoStack
     }, targetDay());

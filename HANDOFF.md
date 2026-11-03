@@ -1,3 +1,34 @@
+# 가슴 펴기 일간 체크 추가 — 2026-11-03
+
+## 현재 작업
+
+사용자 요청: "여기 루틴에 가슴을 당당히 펴고 있는가도 넣어줘." 일간 O/X 체크 항목으로 구현, 로컬 검증까지 완료. 커밋은 로컬(main), 배포와 push 는 아래 승인 대기와 함께.
+
+- `src/logic.js`: `POSTURE`(key `c`, 이름 '가슴 펴기', 부제 '당당히 펴고 있는가', 버튼 'O 폈다' / 'X 움츠렸다', `startKey: 'postureStart'`), `CHECKS = [POSTURE]`.
+  `checksOf(state, ds)`(활성일부터), `checksMarked(state, ds)`(o/x 기록 여부). `HABITS`와 `goalsOf`에는 넣지 않아 설정 목표치, 배너 숫자, 막대, +N 버튼은 그대로다.
+- 판정: `statusOf`는 활성일부터 `c === 'o'`가 아니면(X, 미응답) 그날 전체 미달. 송은과 달리 '해당없음'이 없다. `completion`은 0/1로 분모에 포함(활성일부터).
+  `calMonth`의 오늘 '기록 있음'과 오늘 캔들 색은 `checksMarked`도 본다(X만 눌러도 pending 이 아니라 미달색).
+- `habitMonthStats`가 `checks` 행(이름 '가슴 펴기', 단위 회, days 는 활성일부터, O=정상, 나머지=미달, 누적=O 일수)을 돌려주고 추이 표는 `habits, checks, weeklies` 순.
+- `src/storage.js`: `START_KEYS`에 `postureStart`(처음 연 날로 채움), `c`는 `'o' | 'x' | null`만 통과.
+- `src/views/today.js`: 송은 카드 다음, 주간 카드 앞에 `.card.check-card[data-check="c"]`(O/X 2버튼, aria-pressed, O면 'O' 플래그, X면 'X' 플래그). 그날 활성일 때만.
+- `src/main.js`: `toggleCheck(key, v)`(같은 값 다시 누르면 null). `syncReflection`의 `routine` 불리언은 `statusOf`를 따르므로 밤 9시 푸시가 서버 변경 없이 이 항목을 포함한다.
+- `index.html`: 배너 "가슴 펴기와 송은 룰 포함", 룰 노트에 '가슴 펴기 룰' 한 줄, 추이 표 주석에 "가슴 펴기 O". README 루틴 5개, 스키마 `c`, `postureStart`.
+- 결정(사용자 미확인): O 필수(미응답도 미달)로 둔 것, 카드 위치(송은 다음), 카드 이름 '가슴 펴기' + 부제로 질문 원문, 추이 표 행으로 집계.
+- 턱걸이와 같은 주의: 폰에서 업데이트된 앱을 처음 여는 날이 `postureStart`다. 그날부터 저녁에 O를 누르지 않으면 미달이고 밤 9시 알림이 온다.
+
+## 검증
+
+- `npm test`: 31 files / 315 tests(기존 299 + posture 14 + today.dom 2). `npm run typecheck`, `npm run build` 통과.
+- `node scripts/browser_qa.cjs`: 시드 `postureStart: 오늘`, 오늘 카드 7개(다섯 번째가 가슴 펴기), O 클릭 → `c: 'o'` 저장과 플래그, 다시 클릭 → null, 어제 카드엔 없음.
+  390/320/1200 가로 넘침 0, 브라우저 오류 0. 화면 `/private/tmp/h2-routine-qa/today-320.png` 확인.
+- 라이브 스모크의 카드 수 기대값을 7로 올렸으므로 배포 전에는 `--live-smoke`가 실패한다(의도).
+
+## 운영 반영
+
+앱 푸시 알림 항목의 승인 대기 목록과 같다. `npm run deploy`가 두 변경(푸시 알림, 가슴 펴기)을 함께 올린다.
+
+---
+
 # 앱 푸시 알림 — 2026-10-30
 
 ## 현재 작업

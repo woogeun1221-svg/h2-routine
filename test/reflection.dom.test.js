@@ -45,8 +45,8 @@ describe('하루 만족도', () => {
   });
 
   it('O/X·이유는 백업 왕복을 보존하고 기존 달성 판정은 바꾸지 않는다', () => {
-    const state = { startDate: day, investmentReviewStart: day, rrSnapshotStart: day, pullupStart: day, squatEnd: day,
-      days: { [day]: { ...full, t: 20, self: 'x', selfReason: '핵심 일을 미룸' } } }; // 활성일 당일이라 턱걸이도 필요, 스쿼트는 제외
+    const state = { startDate: day, investmentReviewStart: day, rrSnapshotStart: day, pullupStart: day, squatEnd: day, postureStart: day,
+      days: { [day]: { ...full, t: 20, c: 'o', self: 'x', selfReason: '핵심 일을 미룸' } } }; // 활성일 당일이라 턱걸이, 가슴 펴기도 필요, 스쿼트는 제외
     expect(importText(exportText(state), day)).toEqual(state);
     expect(statusOf(state, day)).toBe('full');
     expect(validateState({ ...state, days: { [day]: { self: true } } })).toContain('.self');

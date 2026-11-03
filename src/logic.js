@@ -15,6 +15,30 @@ export const HABITS = [
 
 export const WIFE = { key: 'w', name: '송은', sub: '해결 먼저, 감정 나중' };
 
+/* 일간 체크 항목 — O/X 한 번으로 기록하고 O여야 그날 통과한다(X나 미응답은 그날 전체 미달). 송은과 달리 '해당없음'이 없다.
+   startKey(활성일)부터만 판정해 추가 전 날짜를 소급해 미달로 바꾸지 않는다. 활성일이 없는 상태에선 없는 항목으로 본다.
+   가슴 펴기(c)는 2026-11-03 추가. yes/no는 카드 버튼 문구, statName은 추이 표의 행 이름. */
+export const POSTURE = {
+  key: 'c', name: '가슴 펴기', sub: '당당히 펴고 있는가', startKey: 'postureStart',
+  yes: 'O 폈다', no: 'X 움츠렸다', statName: '가슴 펴기'
+};
+export const CHECKS = [POSTURE];
+
+/* ds를 주면 그날 판정에 들어가는 체크 항목만, 없으면 활성화된 항목 전부. */
+export function checksOf(state, ds) {
+  return CHECKS.filter(function (item) {
+    var since = state[item.startKey];
+    if (typeof since !== 'string') return false;
+    return ds === undefined || ds >= since;
+  });
+}
+
+/* 그날 체크 항목에 O나 X를 남겼는지 — 오늘 캔들과 캘린더의 '기록 있음' 판정용. */
+export function checksMarked(state, ds) {
+  var d = getDay(state, ds);
+  return checksOf(state, ds).some(function (item) { return d[item.key] === 'o' || d[item.key] === 'x'; });
+}
+
 /* 주간 항목 — 월요일 시작 주간에 한 번, 어느 날이든 완료할 수 있고 금요일까지 미완료면 그 금요일이 미달.
    각자 startKey(활성일)부터 판정하고 day 기록에는 key=true로 완료일을 남긴다. 서로 독립이다.
    action/upcoming/open은 오늘 카드 문구, statName은 추이 표의 행 이름. */
@@ -134,6 +158,9 @@ export function statusOf(state, ds) {
     if (v < h.target) full = false;
     if (v < h.min) min = false;
   }
+  checksOf(state, ds).forEach(function (item) {
+    if (d[item.key] !== 'o') { full = false; min = false; } // 체크 항목은 O여야 통과, X나 미응답은 그날 전체 미달
+  });
   if (d.w === 'x') { full = false; min = false; }  // X = 그날 전체 미달
   WEEKLIES.forEach(function (item) {
     var review = weeklyStatus(state, ds, item);
@@ -150,6 +177,7 @@ export function completion(state, ds) {
     var h = goals[i]; sum += Math.min(1, (d[h.key] || 0) / h.target);
   }
   var count = goals.length;
+  checksOf(state, ds).forEach(function (item) { sum += d[item.key] === 'o' ? 1 : 0; count++; });
   WEEKLIES.forEach(function (item) {
     var review = weeklyStatus(state, ds, item);
     if (review.active && ds === review.friday) {
@@ -235,7 +263,8 @@ export function calMonth(state, ym, today) {
     else if (ds > today) kind = 'future';
     else if (ds === today) {
       var rec = getDay(state, ds);
-      var recorded = completion(state, ds) > 0 || rec.w || WEEKLIES.some(function (item) { return rec[item.key]; });
+      var recorded = completion(state, ds) > 0 || rec.w || checksMarked(state, ds) ||
+        WEEKLIES.some(function (item) { return rec[item.key]; });
       kind = recorded ? statusOf(state, ds) : 'pending';
     } else kind = statusOf(state, ds);
     cells.push({ ds: ds, day: d, kind: kind });
@@ -292,6 +321,7 @@ function weeklyMonthStats(state, ym, today, item) {
    일간 습관은 자기 목표 기준 정상/최소/미달 일수, 누적 합, 달성률.
    나중에 추가한 습관(since)은 활성일부터만, 은퇴한 습관(until)은 종료일 전까지만 세고
    days(자기 표본 일수)로 비율을 낸다.
+   체크 항목(checks, 가슴 펴기)은 활성일부터 O면 정상, X나 미응답이면 미달, 최소는 없고 누적은 O 일수.
    주간 항목은 위 주간 기준, 송은은 o/x/na 일수. total=0이면 일간 표본 없음. */
 export function habitMonthStats(state, ym, today) {
   var monthStart = ym + '-01';
@@ -302,6 +332,10 @@ export function habitMonthStats(state, ym, today) {
   var goals = habitSpans(state);
   var habits = goals.map(function (h) {
     return { key: h.key, name: h.name, unit: h.unit, days: 0, full: 0, min: 0, miss: 0, sum: 0 };
+  });
+  var checkItems = checksOf(state);
+  var checks = checkItems.map(function (item) {
+    return { key: item.key, name: item.statName, unit: '회', days: 0, full: 0, min: 0, miss: 0, sum: 0 };
   });
   var w = { o: 0, x: 0, na: 0 }, total = 0, cur = from;
   while (cur <= to) {
@@ -316,20 +350,25 @@ export function habitMonthStats(state, ym, today) {
       else if (v >= h.min) hs.min++;
       else hs.miss++;
     }
+    for (var ci = 0; ci < checkItems.length; ci++) {
+      if (cur < state[checkItems[ci].startKey]) continue; // 활성일 전은 표본이 아니다
+      var cs = checks[ci]; cs.days++;
+      if (d[checkItems[ci].key] === 'o') { cs.full++; cs.sum++; } else cs.miss++;
+    }
     if (d.w === 'o') w.o++; else if (d.w === 'x') w.x++; else w.na++;
     cur = shift(cur, 1);
   }
-  for (var j = 0; j < habits.length; j++) {
-    var n = habits[j].days;
-    habits[j].fullRate = n ? Math.round(habits[j].full / n * 100) : null;
-    habits[j].minRate = n ? Math.round((habits[j].full + habits[j].min) / n * 100) : null;
-  }
+  habits.concat(checks).forEach(function (row) {
+    var n = row.days;
+    row.fullRate = n ? Math.round(row.full / n * 100) : null;
+    row.minRate = n ? Math.round((row.full + row.min) / n * 100) : null;
+  });
   /* 은퇴한 습관은 표본이 있는 달(은퇴 전)에만 행을 남긴다. 아직 활성일 전인 습관은 기존처럼 0, — 로 둔다. */
   habits = habits.filter(function (hs, k) { return !(goals[k].until && hs.days === 0); });
   /* weeklies: 활성화된 주간 항목 행(투자 원칙, 손익비 스냅샷 순). investment는 기존 호출 호환. */
   var weeklies = WEEKLIES.map(function (item) { return weeklyMonthStats(state, ym, today, item); })
     .filter(function (row) { return row; });
-  return { total: total, habits: habits, weeklies: weeklies, investment: weeklyMonthStats(state, ym, today, INVESTMENT_REVIEW), w: w };
+  return { total: total, habits: habits, checks: checks, weeklies: weeklies, investment: weeklyMonthStats(state, ym, today, INVESTMENT_REVIEW), w: w };
 }
 
 /* 월별 장부 — startDate부터 어제까지, 최신 월부터. */

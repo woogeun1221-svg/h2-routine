@@ -1,9 +1,9 @@
 /* 오늘 화면 렌더 — 일간 카드와 주간 투자 원칙 검토.
-   h(핸들러): { addVal, undoVal, setDirect, toggleW, toggleWeekly(key), selectDay, undoStack }.
+   h(핸들러): { addVal, undoVal, setDirect, toggleW, toggleCheck(key, v), toggleWeekly(key), selectDay, undoStack }.
    day를 주면 그날(과거) 기록을 보여 주고 카드 입력이 그날에 쓰인다 — 연속 생존, 이달 정상, 어제 미달 배너는
    항상 오늘(t) 기준이다. 카드 목록은 goalsOf(state, day)라 그날 활성이던 습관(은퇴 전 스쿼트 등)이 그대로 나온다. */
 import {
-  WIFE, WEEKLIES, goalsOf, shift, daysBetween, weekday,
+  WIFE, WEEKLIES, goalsOf, checksOf, checksMarked, shift, daysBetween, weekday,
   getDay, statusOf, completion, streak, monthFullRate, weeklyStatus
 } from '../logic.js';
 import { renderReflection } from './reflection.js';
@@ -115,6 +115,30 @@ function renderCards(state, t, h) {
   wc.appendChild(wtop); wc.appendChild(seg);
   wrap.appendChild(wc);
 
+  /* ----- 일간 체크 카드 (가슴 펴기: O / X, O여야 통과) — 그날 활성인 항목만 ----- */
+  checksOf(state, t).forEach(function (item) {
+    var v = (d[item.key] === 'o' || d[item.key] === 'x') ? d[item.key] : null;
+    var cc = document.createElement('div'); cc.className = 'card check-card';
+    cc.dataset.check = item.key;
+    var ctop = document.createElement('div'); ctop.className = 'card-top';
+    var cnm = document.createElement('div'); cnm.className = 'card-name';
+    cnm.innerHTML = item.name + '<span class="card-sub">' + item.sub + '</span>' +
+      (v === 'o' ? '<span class="done-flag full">O</span>' :
+       v === 'x' ? '<span class="done-flag miss">X</span>' : '');
+    ctop.appendChild(cnm);
+    var cseg = document.createElement('div'); cseg.className = 'btns seg';
+    [{ v: 'o', label: item.yes, cls: 'sel-o' }, { v: 'x', label: item.no, cls: 'sel-x' }].forEach(function (opt) {
+      var b = document.createElement('button');
+      b.className = 'btn' + ((v === opt.v) ? ' ' + opt.cls : '');
+      b.textContent = opt.label;
+      b.setAttribute('aria-pressed', v === opt.v ? 'true' : 'false');
+      b.addEventListener('click', function () { h.toggleCheck(item.key, opt.v); });
+      cseg.appendChild(b);
+    });
+    cc.appendChild(ctop); cc.appendChild(cseg);
+    wrap.appendChild(cc);
+  });
+
   WEEKLIES.forEach(function (item) { renderWeeklyCard(state, t, h, wrap, item); });
 }
 
@@ -196,7 +220,7 @@ function renderStrip(state, t, h, day) {
       var comp = completion(state, ds);
       c.style.height = Math.max(7, Math.round(comp * 100)) + '%';
       if (ds === t) {
-        c.className = 'candle today' + (comp > 0 || getDay(state, ds).w ? ' ' + statusOf(state, ds) : '');
+        c.className = 'candle today' + (comp > 0 || getDay(state, ds).w || checksMarked(state, ds) ? ' ' + statusOf(state, ds) : '');
         if (comp === 0) c.style.height = '7%';
       } else {
         c.className = 'candle ' + statusOf(state, ds);

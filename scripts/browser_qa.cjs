@@ -18,7 +18,8 @@ const firstOfMonth = date.slice(0, 8) + '01';
 const yesterday = new Date(date + 'T12:00:00+09:00'); yesterday.setDate(yesterday.getDate() - 1);
 const yesterdayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(yesterday);
 // rrSnapshotStart=오늘: 손익비 스냅샷(2026-10-29 추가) 주간 카드는 활성일부터.
-const seed = { startDate: '2026-08-19', investmentReviewStart: '2026-08-19', rrSnapshotStart: date, pullupStart: date, squatEnd: date,
+// postureStart=오늘: 가슴 펴기(2026-11-03 추가) O/X 카드는 활성일부터, 어제 카드엔 없다.
+const seed = { startDate: '2026-08-19', investmentReviewStart: '2026-08-19', rrSnapshotStart: date, pullupStart: date, squatEnd: date, postureStart: date,
   days: { '2026-08-19': oldRecord,
     '2026-08-20': { self: 'o', selfReason: 'O로 바꾼 뒤에도 남겨둔 사유' },
     ...(firstOfMonth === date ? {} : { [firstOfMonth]: { self: 'o' } }),
@@ -53,7 +54,8 @@ const server = http.createServer((req, res) => {
         '스스로에게 만족할만한 하루를 보냈는가?');
       assert.equal(await page.locator('#reflection .reflection-motto').textContent(), '컨트롤 할 수 있는 건 오로지 나뿐');
       assert.equal(await page.locator('#reflection .reflection-choices button').count(), 2);
-      assert.equal(await page.locator('#cards .card').count(), 6); // 일간 3(스쿼트 은퇴) + 송은 + 투자 원칙 + 손익비 스냅샷
+      assert.equal(await page.locator('#cards .card').count(), 7); // 일간 3(스쿼트 은퇴) + 송은 + 가슴 펴기 + 투자 원칙 + 손익비 스냅샷
+      assert((await page.locator('[data-check="c"] .card-name').innerText()).includes('가슴 펴기'));
       assert((await page.locator('[data-weekly="rr"]').innerText()).includes('손익비 스냅샷'));
       assert.equal(await page.locator('#cards .card .btn').first().textContent(), '+5');
       assert.equal(await page.locator('#dayPrev').isVisible(), true);
@@ -251,8 +253,22 @@ const server = http.createServer((req, res) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.locator('[data-tab="today"]').click();
     assert.equal(await page.locator('#screen-iron').isVisible(), false);
-    assert.equal(await page.locator('#cards .card').count(), 6); // 일간 3(푸쉬업, 턱걸이, 독서) + 송은 + 투자 원칙 + 손익비 스냅샷
+    assert.equal(await page.locator('#cards .card').count(), 7); // 일간 3(푸쉬업, 턱걸이, 독서) + 송은 + 가슴 펴기 + 투자 원칙 + 손익비 스냅샷
     assert((await page.locator('#cards .card').nth(1).innerText()).includes('턱걸이'));
+    // 가슴 펴기(2026-11-03 추가): 송은 다음 카드. O를 누르면 c='o' 저장과 O 플래그, 다시 누르면 미응답으로. 활성일(오늘) 전인 어제엔 카드가 없다.
+    const postureCard = page.locator('[data-check="c"]');
+    assert.equal(await page.locator('#cards .card').nth(4).getAttribute('data-check'), 'c');
+    assert((await postureCard.locator('.card-name').innerText()).includes('가슴 펴기'));
+    assert.deepEqual(await postureCard.locator('.btn').allInnerTexts(), ['O 폈다', 'X 움츠렸다']);
+    await postureCard.locator('.btn', { hasText: 'O 폈다' }).click();
+    assert.equal(await postureCard.locator('.done-flag').innerText(), 'O');
+    let postureStored = await page.evaluate(() => JSON.parse(localStorage.getItem('h2-routine-v1')));
+    assert.equal(postureStored.days[date].c, 'o');
+    assert.equal(postureStored.postureStart, date);
+    await postureCard.locator('.btn', { hasText: 'O 폈다' }).click();
+    postureStored = await page.evaluate(() => JSON.parse(localStorage.getItem('h2-routine-v1')));
+    assert.equal(postureStored.days[date].c, null);
+    assert.equal(await postureCard.locator('.done-flag').count(), 0);
     // 손익비 스냅샷: 투자 원칙과 독립 토글, rr=true 로 저장, 취소하면 지워진다. 링크는 새 탭.
     const rrCard = page.locator('[data-weekly="rr"]');
     assert.equal(await rrCard.locator('.weekly-link').getAttribute('target'), '_blank');
@@ -283,6 +299,7 @@ const server = http.createServer((req, res) => {
     let names = await page.locator('#cards .card-name').allInnerTexts();
     assert(names[1].includes('스쿼트'));
     assert.equal(names.some(n => n.includes('턱걸이')), false);
+    assert.equal(names.some(n => n.includes('가슴 펴기')), false);
     await page.locator('#cards .card').nth(0).locator('.btn', { hasText: '+5' }).click();
     await page.locator('#cards .card').nth(1).locator('.btn', { hasText: '+50' }).click();
     let stored = await page.evaluate(() => JSON.parse(localStorage.getItem('h2-routine-v1')));

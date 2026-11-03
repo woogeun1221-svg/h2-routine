@@ -93,7 +93,7 @@ function renderHabitStats(state, t, ym) {
     return;
   }
 
-  var rows = stats.habits.concat(stats.weeklies || []);
+  var rows = stats.habits.concat(stats.checks || [], stats.weeklies || []);
   rows.forEach(function (h) {
     var tr = document.createElement('tr');
     tr.innerHTML = '<td>' + h.name + '</td>' +

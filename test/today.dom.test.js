@@ -67,6 +67,37 @@ describe('renderToday DOM 스모크', () => {
     expect(document.getElementById('banner').className).not.toContain('show');
   });
 
+  it('가슴 펴기 카드 — 활성일부터 송은 다음, O/X가 toggleCheck를 부르고 O면 플래그, 활성 전날 보기엔 없다', () => {
+    const toggleCheck = vi.fn();
+    const state = { startDate: '2026-07-01', postureStart: '2026-07-22', days: { '2026-07-22': { ...FULL, c: 'o' } } };
+    renderToday(state, '2026-07-22', { ...handlers, toggleCheck });
+    const cards = document.querySelectorAll('#cards .card');
+    expect(cards.length).toBe(7); // 일간 3 + 송은 + 가슴 펴기 + 주간 2
+    const card = document.querySelector('[data-check="c"]');
+    expect(cards[4]).toBe(card);
+    expect(card.querySelector('.card-name').textContent).toContain('가슴 펴기');
+    expect(card.querySelector('.card-sub').textContent).toBe('당당히 펴고 있는가');
+    expect(card.querySelector('.done-flag').textContent).toBe('O');
+    const buttons = card.querySelectorAll('.btn');
+    expect([...buttons].map(b => b.textContent)).toEqual(['O 폈다', 'X 움츠렸다']);
+    expect(buttons[0].getAttribute('aria-pressed')).toBe('true');
+    buttons[1].click();
+    expect(toggleCheck).toHaveBeenCalledWith('c', 'x');
+    expect(document.querySelectorAll('#strip .candle')[13].className).toContain('full');
+    expect(document.getElementById('goalFullNums').textContent).toBe('100 · 100 · 20'); // 목표 숫자엔 안 들어간다
+    renderToday(state, '2026-07-22', { ...handlers, toggleCheck }, '2026-07-21');
+    expect(document.querySelector('[data-check="c"]')).toBe(null);
+    expect(document.querySelectorAll('#cards .card').length).toBe(6);
+  });
+
+  it('가슴 펴기 X만 눌러도 오늘 캔들이 미달색, 미응답이면 진행중(무색)', () => {
+    const base = { startDate: '2026-07-01', postureStart: '2026-07-22', days: {} };
+    renderToday({ ...base, days: { '2026-07-22': { c: 'x' } } }, '2026-07-22', handlers);
+    expect(document.querySelectorAll('#strip .candle')[13].className).toContain('miss');
+    renderToday(base, '2026-07-22', handlers);
+    expect(document.querySelectorAll('#strip .candle')[13].className).toBe('candle today');
+  });
+
   it('송은 X면 오늘 캔들이 미달색', () => {
     const state = { startDate: '2026-07-01', days: { '2026-07-22': { ...FULL, w: 'x' } } };
     renderToday(state, '2026-07-22', handlers);
