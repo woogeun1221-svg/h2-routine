@@ -31,7 +31,8 @@
 4. `pair` → `pairing_message_sent: true`(메인컨트롤 DM).
 5. 라이브 스모크: Pages 빌드는 바로 끝났지만 CDN 이 약 2분간 옛 번들(index-D2Fyi04p)을 내보내 첫 실행은 카드 6≠7 로 실패.
    새 번들(index-CsoVa9kO)이 보인 뒤 재실행 통과(status 200, 카드 7, 브라우저 오류 0). 배포 직후엔 서빙 번들을 먼저 확인할 것.
-6. 폰 구독 대기 중. 구독이 잡히면 `push-test` 를 실행하고 결과를 여기에 추가한다(실제 Apple 푸시는 그때가 첫 발송).
+6. 12:53 폰 구독 확인(paired_devices 1, subscriptions 1) 직후 `push-test` → `{"sent": 1, "statuses": [201], "dropped": 0}`.
+   Apple 푸시 서비스로의 첫 실제 발송이 201 로 수락됐다. 폰 화면 표시는 사용자 확인 사항. 오늘 밤 21:00(루틴 미달 시), 23:00(만족도 미응답 시)이 첫 예약 발송.
 
 ---
 
