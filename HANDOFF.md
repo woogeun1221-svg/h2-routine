@@ -23,9 +23,15 @@
   390/320/1200 가로 넘침 0, 브라우저 오류 0. 화면 `/private/tmp/h2-routine-qa/today-320.png` 확인.
 - 라이브 스모크의 카드 수 기대값을 7로 올렸으므로 배포 전에는 `--live-smoke`가 실패한다(의도).
 
-## 운영 반영
+## 운영 반영 (2026-11-03 12:45~12:52, 사용자 "OK", 푸시 알림 항목의 승인 목록과 함께)
 
-앱 푸시 알림 항목의 승인 대기 목록과 같다. `npm run deploy`가 두 변경(푸시 알림, 가슴 펴기)을 함께 올린다.
+1. `launchctl kickstart -k gui/$(id -u)/com.woogeun.routine.api` → pid 80250, `/health` ok, `/push/key` 200, `data/vapid.json`(0600) 생성됨.
+2. `npm run deploy` → gh-pages ad31b71(deploy 455eef2). `git push origin main` eefb279..455eef2(9c74fd6 푸시 알림 포함).
+3. reminder plist 교체(bootout → cp → bootstrap): 설치본 StartCalendarInterval 21:00, 23:00 확인.
+4. `pair` → `pairing_message_sent: true`(메인컨트롤 DM).
+5. 라이브 스모크: Pages 빌드는 바로 끝났지만 CDN 이 약 2분간 옛 번들(index-D2Fyi04p)을 내보내 첫 실행은 카드 6≠7 로 실패.
+   새 번들(index-CsoVa9kO)이 보인 뒤 재실행 통과(status 200, 카드 7, 브라우저 오류 0). 배포 직후엔 서빙 번들을 먼저 확인할 것.
+6. 폰 구독 대기 중. 구독이 잡히면 `push-test` 를 실행하고 결과를 여기에 추가한다(실제 Apple 푸시는 그때가 첫 발송).
 
 ---
 
@@ -69,7 +75,7 @@
   화면: `/private/tmp/h2-routine-qa/settings-390.png`.
 - 실제 푸시 서비스(Apple)로는 아직 한 번도 보내지 않았다. 폰에서 구독한 뒤 `python3 scripts/reminder_service.py push-test`로 확인해야 한다.
 
-## 운영 반영 (승인 대기, 이 순서로)
+## 운영 반영 (승인 대기, 이 순서로) → 2026-11-03 실행 완료, 기록은 위 가슴 펴기 항목의 운영 반영 참조
 
 1. `launchctl kickstart -k gui/$(id -u)/com.woogeun.routine.api` — 새 엔드포인트(`/push/key`, `/push/subscribe`)와 VAPID 키 생성.
 2. `npm run deploy`(gh-pages) + `git push origin main`.
