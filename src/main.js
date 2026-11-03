@@ -74,7 +74,7 @@ function renderPushControls() {
 function clearBadge() {
   if (navigator.clearAppBadge) navigator.clearAppBadge().catch(function () {});
 }
-/* 봇에는 오늘 날짜, 응답 여부, 루틴이 최소 포지션 이상인지만 보낸다 (밤 9시 알림은 미달일 때만) */
+/* 봇에는 오늘 날짜, 응답 여부, 루틴이 최소 포지션 이상인지만 보낸다 (루틴 알림은 두 시간마다, 미달일 때만) */
 function syncReflection() {
   var t = todayStr(), answer = getDay(state, t).self;
   return reminders.enqueue(t, answer === 'o' || answer === 'x', statusOf(state, t) !== 'miss');

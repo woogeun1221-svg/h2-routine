@@ -168,9 +168,85 @@ class ReminderTests(unittest.TestCase):
         store = Store(path)
         store = Store(path)  # 두 번 열어도 같다
         self.assertEqual(store.state('2026-09-16')['reminders'], {'reflection': 'sent'})
+        with store.connect() as db:
+            self.assertEqual(db.execute('SELECT kind, slot FROM reminders').fetchall(), [('reflection', 23)])
         self.assertEqual(store.state('2026-09-17')['answered'], True)
         self.assertEqual(store.state('2026-09-17')['routine_done'], False)
         self.assertEqual(store.state('2026-09-17')['subscriptions'], 0)
+
+    def test_migrates_2026_10_schema_to_two_hour_slots(self):
+        path = Path(self.temp.name) / 'v2.sqlite3'
+        db = sqlite3.connect(path)
+        db.executescript('''
+            CREATE TABLE pairings (code_hash TEXT PRIMARY KEY, expires TEXT NOT NULL);
+            CREATE TABLE devices (token_hash TEXT PRIMARY KEY, created TEXT NOT NULL);
+            CREATE TABLE answers (device TEXT NOT NULL, day TEXT NOT NULL, answered INTEGER NOT NULL,
+                updated TEXT NOT NULL, routine INTEGER, PRIMARY KEY(device, day));
+            CREATE TABLE reminders (day TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL, updated TEXT NOT NULL,
+                PRIMARY KEY(day, kind));
+            CREATE TABLE subscriptions (endpoint TEXT PRIMARY KEY, device TEXT NOT NULL, p256dh TEXT NOT NULL,
+                auth TEXT NOT NULL, created TEXT NOT NULL);
+            INSERT INTO devices VALUES ('d', '2026-10-30');
+            INSERT INTO reminders VALUES ('2026-11-02', 'routine', 'sent', '2026-11-02T21:00');
+            INSERT INTO reminders VALUES ('2026-11-02', 'reflection', 'failed', '2026-11-02T23:00');
+        ''')
+        db.commit(); db.close()
+        store = Store(path)
+        store = Store(path)
+        with store.connect() as db:
+            rows = db.execute('SELECT kind, slot, status FROM reminders WHERE day = ? ORDER BY slot', ('2026-11-02',)).fetchall()
+        self.assertEqual(rows, [('routine', 21, 'sent'), ('reflection', 23, 'failed')])
+        self.assertEqual(store.state('2026-11-02')['reminders'], {'routine': 'sent', 'reflection': 'failed'})
+
+    def test_routine_nudges_every_two_hours_until_a_device_reports_minimum(self):
+        self.store.add_subscription(self.token, parse_subscription(subscription()), self.now)
+        self.pusher.return_value = [{'endpoint': subscription()['endpoint'], 'status': 201}]
+        day = datetime(2026, 9, 18, 9, 0, tzinfo=KST)  # 금요일
+        self.assertEqual(self.run_reminder(day.replace(hour=7)), 'outside_schedule')
+        self.assertEqual(self.run_reminder(day.replace(hour=8)), 'outside_schedule')
+        for hour in (9, 11, 13):
+            self.assertEqual(self.run_reminder(day.replace(hour=hour)), 'sent')
+            self.assertEqual(self.run_reminder(day.replace(hour=hour, minute=5)), 'already_attempted')
+        self.assertEqual(self.pusher.call_count, 3)
+        payload = self.pusher.call_args[0][1]
+        self.assertEqual(payload['tag'], 'h2-routine-routine')
+        self.assertTrue(payload['body'].startswith('오후 1시.'))
+        self.assertIn('가슴을 당당히 펴고 있는가?', payload['body'])
+        self.assertIn('투자 원칙 검토와 손익비 스냅샷', payload['body'])
+        self.assertNotIn('밤 9시', payload['body'])
+        self.assertNotIn('·', payload['body'])
+        self.sender.assert_not_called()
+        # 사이에 최소 포지션 이상 보고가 오면 다음 슬롯부터 멈추고, 미달로 돌아가면 다시 보낸다.
+        self.store.answer(self.token, '2026-09-18', False, day.replace(hour=14), routine=True)
+        self.assertEqual(self.run_reminder(day.replace(hour=15)), 'routine_done')
+        self.store.answer(self.token, '2026-09-18', False, day.replace(hour=16), routine=False)
+        self.assertEqual(self.run_reminder(day.replace(hour=17)), 'sent')
+        self.assertEqual(self.run_reminder(day.replace(hour=19)), 'sent')
+        self.assertTrue(self.pusher.call_args[0][1]['body'].startswith('저녁 7시.'))
+        self.assertEqual(self.run_reminder(day.replace(hour=21)), 'sent')
+        self.assertTrue(self.pusher.call_args[0][1]['body'].startswith('밤 9시.'))
+        self.assertEqual(self.run_reminder(day.replace(hour=22)), 'outside_schedule')
+        result = remind(self.store, now=day.replace(hour=23), sender=self.sender, pusher=self.pusher)
+        self.assertEqual((result['kind'], result['slot'], result['channel']), ('reflection', 23, 'push'))
+        self.assertEqual(self.store.state('2026-09-18')['reminders'], {'routine': 'sent', 'reflection': 'sent'})
+        self.assertEqual(self.pusher.call_count, 7)
+        self.sender.assert_not_called()
+
+    def test_daytime_slots_never_fall_back_to_the_bot(self):
+        noon = self.now.replace(hour=13)
+        self.assertEqual(self.run_reminder(noon), 'skipped')  # 구독 없음: 낮에는 봇으로 넘기지 않는다
+        self.assertEqual(self.run_reminder(noon.replace(minute=30)), 'skipped')  # skipped 는 재시도되지만 여전히 봇은 아니다
+        self.sender.assert_not_called()
+        self.store.add_subscription(self.token, parse_subscription(subscription()), self.now)
+        self.pusher.return_value = [{'endpoint': subscription()['endpoint'], 'status': 500}]
+        self.assertEqual(self.run_reminder(noon.replace(hour=15)), 'failed')
+        self.sender.assert_not_called()
+        self.assertEqual(self.store.state('2026-09-17')['subscriptions'], 1)
+        # 21시와 23시는 지금처럼 봇으로 넘어간다.
+        self.assertEqual(self.run_reminder(self.evening), 'sent')
+        self.assertEqual(self.run_reminder(self.now), 'sent')
+        self.assertEqual(self.sender.call_count, 2)
+        self.assertIn('밤 9시', self.sender.call_args_list[0][0][0])
 
     def test_subscription_validation(self):
         self.assertEqual(parse_subscription(subscription())['auth'], AUTH)

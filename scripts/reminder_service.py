@@ -4,10 +4,10 @@
 DB에는 기기 인증정보의 해시, 날짜별 응답 여부와 루틴 충족 여부(불리언), 푸시 구독만 저장한다.
 O/X 선택값, X의 이유, 운동 수치는 수신하지 않는다.
 
-알림 종류(한국 시간, launchd StartCalendarInterval):
-  routine     21:00  어느 기기도 오늘 루틴이 최소 포지션 이상이라고 보고하지 않았으면 한 번
-  reflection  23:00  어느 기기도 오늘 만족도 응답을 보고하지 않았으면 한 번
-전달: 푸시 구독이 있으면 Web Push, 구독이 없거나 모두 실패하면 메인컨트롤 봇 DM.
+알림 종류(한국 시간, launchd StartCalendarInterval 과 같은 SCHEDULE):
+  routine     09:00 부터 21:00 까지 두 시간마다. 어느 기기도 오늘 루틴이 최소 포지션 이상이라고 보고하지 않았으면 슬롯마다 한 번
+  reflection  23:00. 어느 기기도 오늘 만족도 응답을 보고하지 않았으면 한 번
+전달: 푸시 구독이 있으면 Web Push. 구독이 없거나 모두 실패하면 21:00 과 23:00(BOT_HOURS)만 메인컨트롤 봇 DM, 낮 슬롯은 건너뛴다.
 """
 from __future__ import annotations
 
@@ -37,7 +37,10 @@ NOTIFIER = ROOT.parent / '_core' / 'tg-notify'
 ORIGIN = 'https://woogeun1221-svg.github.io'
 SITE = ORIGIN + '/h2-routine/'
 KST = ZoneInfo('Asia/Seoul')
-KINDS = {'routine': 21, 'reflection': 23}  # 종류 → 발송 시(한국 시간)
+# 발송 시(한국 시간) → 종류. 두 시간 간격(2026-11-03). 설치된 launchd plist 의 StartCalendarInterval 과 같아야 한다.
+SCHEDULE = {9: 'routine', 11: 'routine', 13: 'routine', 15: 'routine', 17: 'routine', 19: 'routine', 21: 'routine', 23: 'reflection'}
+KINDS = ('routine', 'reflection')
+BOT_HOURS = (21, 23)  # 푸시가 없거나 실패했을 때 메인컨트롤 봇으로 대신 보내는 슬롯(봇은 하루 두 번 유지)
 B64URL = re.compile(r'^[A-Za-z0-9_-]+$')
 
 
@@ -94,8 +97,8 @@ class Store:
                     updated TEXT NOT NULL, routine INTEGER, PRIMARY KEY(device, day)
                 );
                 CREATE TABLE IF NOT EXISTS reminders (
-                    day TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL, updated TEXT NOT NULL,
-                    PRIMARY KEY(day, kind)
+                    day TEXT NOT NULL, kind TEXT NOT NULL, slot INTEGER NOT NULL, status TEXT NOT NULL, updated TEXT NOT NULL,
+                    PRIMARY KEY(day, kind, slot)
                 );
                 CREATE TABLE IF NOT EXISTS subscriptions (
                     endpoint TEXT PRIMARY KEY, device TEXT NOT NULL, p256dh TEXT NOT NULL,
@@ -119,6 +122,18 @@ class Store:
                 );
                 INSERT INTO reminders SELECT day, 'reflection', status, updated FROM reminders_v1;
                 DROP TABLE reminders_v1;
+            ''')
+        if 'slot' not in [row[1] for row in db.execute('PRAGMA table_info(reminders)')]:
+            # 2026-10-30 스키마(day, kind 한 번)를 두 시간 슬롯(2026-11-03)으로. 옛 행은 그 종류의 원래 시각 슬롯에 둔다.
+            db.executescript('''
+                ALTER TABLE reminders RENAME TO reminders_v2;
+                CREATE TABLE reminders (
+                    day TEXT NOT NULL, kind TEXT NOT NULL, slot INTEGER NOT NULL, status TEXT NOT NULL, updated TEXT NOT NULL,
+                    PRIMARY KEY(day, kind, slot)
+                );
+                INSERT INTO reminders
+                    SELECT day, kind, CASE kind WHEN 'reflection' THEN 23 ELSE 21 END, status, updated FROM reminders_v2;
+                DROP TABLE reminders_v2;
             ''')
 
     @contextmanager
@@ -196,7 +211,8 @@ class Store:
             paired = db.execute('SELECT COUNT(*) FROM devices').fetchone()[0]
             answered = db.execute('SELECT 1 FROM answers WHERE day = ? AND answered = 1 LIMIT 1', (day,)).fetchone()
             routine = db.execute('SELECT 1 FROM answers WHERE day = ? AND routine = 1 LIMIT 1', (day,)).fetchone()
-            reminders = dict(db.execute('SELECT kind, status FROM reminders WHERE day = ?', (day,)).fetchall())
+            # 종류별 마지막 슬롯의 상태(슬롯 순으로 덮어쓴다)
+            reminders = dict(db.execute('SELECT kind, status FROM reminders WHERE day = ? ORDER BY slot', (day,)).fetchall())
             subscriptions = db.execute('SELECT COUNT(*) FROM subscriptions').fetchone()[0]
         return {'paired_devices': paired, 'answered': bool(answered), 'routine_done': bool(routine),
                 'reminder': reminders.get('reflection'), 'reminders': reminders, 'subscriptions': subscriptions}
@@ -248,18 +264,35 @@ def friday_note(now):
     return ' 금요일이라 투자 원칙 검토와 손익비 스냅샷도 오늘까지.' if now.weekday() == 4 else ''
 
 
+def hour_label(hour):
+    if hour < 12:
+        return f'오전 {hour}시'
+    if hour < 18:
+        return f'오후 {hour - 12}시'
+    if hour < 21:
+        return f'저녁 {hour - 12}시'
+    return f'밤 {hour - 12}시'
+
+
+def routine_body(now, casual=False):
+    """낮 슬롯은 가슴 펴기 질문으로 시작하고, 21시는 자기 전 마지막 재촉. casual 은 봇 DM 말투."""
+    miss = '미달이야' if casual else '미달이다'
+    if now.hour >= 21:
+        return f'밤 9시. 오늘 루틴이 아직 {miss}. 최소 포지션이라도 채우고 자자. 두 번 연속 거르지 않는다.' + friday_note(now)
+    return (f'{hour_label(now.hour)}. 가슴을 당당히 펴고 있는가? 오늘 루틴은 아직 {miss}. 지금 한 포지션이라도 쌓자.'
+            + friday_note(now))
+
+
 def push_payload(kind, day, now):
     if kind == 'routine':
-        return {'title': 'H2 루틴', 'tag': 'h2-routine-routine', 'url': SITE,
-                'body': '밤 9시. 오늘 루틴이 아직 미달이다. 최소 포지션이라도 채우고 자자. 두 번 연속 거르지 않는다.' + friday_note(now)}
+        return {'title': 'H2 루틴', 'tag': 'h2-routine-routine', 'url': SITE, 'body': routine_body(now)}
     return {'title': '하루 만족도', 'tag': 'h2-routine-reflection', 'url': SITE,
             'body': '아직 오늘의 O/X를 안 골랐다. 스스로에게 만족할만한 하루를 보냈는가? O든 X든 직접 고르고, X라면 이유도 남기자.'}
 
 
 def telegram_text(kind, day, now):
     if kind == 'routine':
-        return (f'{day} 밤 9시. 오늘 루틴이 아직 미달이야. 최소 포지션이라도 채우고 자자. 두 번 연속 거르지 않는다.'
-                + friday_note(now) + '\n' + SITE)
+        return f'{day} ' + routine_body(now, casual=True) + '\n' + SITE
     return (
         f'{day} 아직 오늘의 O/X를 안 골랐네. 왜 미뤄두고 있어?\n\n'
         '스스로에게 만족할만한 하루를 보냈는가? 컨트롤 할 수 있는 건 오로지 나뿐.\n\n'
@@ -273,15 +306,14 @@ def reminder_text(day):
 
 
 def kind_for(now):
-    for kind, hour in KINDS.items():
-        if now.hour == hour:
-            return kind
-    return None
+    return SCHEDULE.get(now.hour)
 
 
-def deliver(store, kind, day, now, sender, pusher):
-    """푸시 구독이 있으면 푸시, 없거나 전부 실패하면 메인컨트롤 봇. 끊긴 구독(404, 410)은 지운다."""
+def deliver(store, kind, day, now, sender, pusher, bot=True):
+    """푸시 구독이 있으면 푸시. 없거나 전부 실패하면 bot 슬롯(21시, 23시)만 메인컨트롤 봇, 낮 슬롯은 건너뛴다(skipped, failed).
+    끊긴 구독(404, 410)은 지운다."""
     subscriptions = store.subscriptions()
+    pushed = False
     if subscriptions:
         try:
             results = pusher(subscriptions, push_payload(kind, day, now))
@@ -292,6 +324,9 @@ def deliver(store, kind, day, now, sender, pusher):
             store.drop_subscriptions(gone)
         if any(200 <= int(r.get('status') or 0) < 300 for r in results):
             return 'sent', 'push'
+        pushed = True
+    if not bot:
+        return ('failed', 'push') if pushed else ('skipped', None)
     try:
         return ('sent' if sender(telegram_text(kind, day, now)) else 'failed'), 'telegram'
     except Exception:
@@ -304,6 +339,7 @@ def remind(store, *, now=None, kind=None, sender=send_message, pusher=send_push,
     kind = kind or kind_for(now)
     if kind not in KINDS:
         return {'action': 'outside_schedule', 'day': day}
+    slot = now.hour  # 같은 날 같은 종류라도 슬롯마다 한 번. --kind 로 수동 실행하면 그 시각이 슬롯이다.
     skip = 'answered' if kind == 'reflection' else 'routine_done'
     # 이 트랜잭션은 중복 실행의 발송 예약을 직렬화한다.
     with store.connect() as db:
@@ -313,14 +349,15 @@ def remind(store, *, now=None, kind=None, sender=send_message, pusher=send_push,
         column = 'answered' if kind == 'reflection' else 'routine'
         if db.execute(f'SELECT 1 FROM answers WHERE day = ? AND {column} = 1 LIMIT 1', (day,)).fetchone():
             return {'action': skip, 'day': day, 'kind': kind}
-        old = db.execute('SELECT status FROM reminders WHERE day = ? AND kind = ?', (day, kind)).fetchone()
+        old = db.execute('SELECT status FROM reminders WHERE day = ? AND kind = ? AND slot = ?', (day, kind, slot)).fetchone()
         if old and old[0] in ('sending', 'sent'):
-            return {'action': 'already_attempted', 'day': day, 'kind': kind}
+            return {'action': 'already_attempted', 'day': day, 'kind': kind, 'slot': slot}
         if dry_run:
-            return {'action': 'would_send', 'day': day, 'kind': kind, 'subscriptions': len(store.subscriptions())}
-        db.execute('''INSERT INTO reminders VALUES (?, ?, 'sending', ?)
-            ON CONFLICT(day, kind) DO UPDATE SET status='sending', updated=excluded.updated''',
-                   (day, kind, now.isoformat()))
+            return {'action': 'would_send', 'day': day, 'kind': kind, 'slot': slot, 'bot': slot in BOT_HOURS,
+                    'subscriptions': len(store.subscriptions())}
+        db.execute('''INSERT INTO reminders VALUES (?, ?, ?, 'sending', ?)
+            ON CONFLICT(day, kind, slot) DO UPDATE SET status='sending', updated=excluded.updated''',
+                   (day, kind, slot, now.isoformat()))
 
     # 예약 직후 도착한 보고는 발송 전에 한 번 더 확인한다.
     current = store.state(day)
@@ -328,11 +365,11 @@ def remind(store, *, now=None, kind=None, sender=send_message, pusher=send_push,
     if current[skip]:
         status = skip
     else:
-        status, channel = deliver(store, kind, day, now, sender, pusher)
+        status, channel = deliver(store, kind, day, now, sender, pusher, bot=slot in BOT_HOURS)
     with store.connect() as db:
-        db.execute('UPDATE reminders SET status = ?, updated = ? WHERE day = ? AND kind = ?',
-                   (status, now_kst().isoformat(), day, kind))
-    result = {'action': status, 'day': day, 'kind': kind}
+        db.execute('UPDATE reminders SET status = ?, updated = ? WHERE day = ? AND kind = ? AND slot = ?',
+                   (status, now_kst().isoformat(), day, kind, slot))
+    result = {'action': status, 'day': day, 'kind': kind, 'slot': slot}
     if channel:
         result['channel'] = channel
     return result
@@ -496,7 +533,8 @@ def main():
     serve = commands.add_parser('serve')
     serve.add_argument('--port', type=int, default=8815)
     reminder = commands.add_parser('remind')
-    reminder.add_argument('--kind', choices=sorted(KINDS), default=None, help='생략하면 현재 시각(21시, 23시)으로 정한다')
+    reminder.add_argument('--kind', choices=sorted(KINDS), default=None,
+                          help='생략하면 현재 시각으로 정한다(9시부터 21시까지 두 시간마다 routine, 23시 reflection)')
     reminder.add_argument('--dry-run', action='store_true')
     commands.add_parser('pair')
     commands.add_parser('status')

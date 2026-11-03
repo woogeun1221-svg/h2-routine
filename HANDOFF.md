@@ -1,3 +1,37 @@
+# 알림 두 시간 간격 — 2026-11-03
+
+## 현재 작업
+
+사용자 요청: "앱 알림은 두시간마다 오면 좋을 것 같아." 해석: 기존 조건부 루틴 재촉의 간격 변경. 오전 9시부터 밤 9시까지 두 시간마다(9, 11, 13, 15, 17, 19, 21시)
+어느 기기도 오늘 루틴이 최소 포지션 이상이라고 보고하지 않았으면 슬롯마다 한 번. 밤 11시 만족도 재촉은 그대로. 상태와 무관한 무조건 알림은 아니다.
+
+- `scripts/reminder_service.py`: `KINDS` 사전을 `SCHEDULE`(시 → 종류)과 `KINDS` 튜플로. `kind_for`는 `SCHEDULE.get(hour)`. `BOT_HOURS = (21, 23)`.
+  `reminders` 테이블에 `slot`(시) 추가, PK (day, kind, slot). `migrate`가 2026-10-30 스키마(day, kind)를 보존 이행(옛 행은 routine 21, reflection 23 슬롯).
+  `remind`는 `slot = now.hour`로 슬롯마다 한 번(`already_attempted`는 같은 슬롯만). 결과에 `slot`, dry-run 에 `bot` 추가. `state().reminders`는 종류별 마지막 슬롯 상태.
+  `deliver(bot=...)`: 낮 슬롯은 푸시만. 구독이 없으면 `skipped`, 푸시가 전부 실패하면 `failed`로 기록하고 봇으로 넘기지 않는다. 21시와 23시만 봇 폴백(봇은 하루 두 번 유지).
+  문구: `routine_body(now)`. 낮 슬롯은 "오전 9시. 가슴을 당당히 펴고 있는가? 오늘 루틴은 아직 미달이다. 지금 한 포지션이라도 쌓자.", 21시는 기존 "밤 9시. …자자." 금요일 문구는 모든 슬롯.
+  tag 는 그대로 `h2-routine-routine`이라 폰에는 최신 알림 하나만 남는다(SW renotify).
+- `launchd/com.woogeun.routine.reminder.plist`(저장소 사본): StartCalendarInterval 8개(9, 11, 13, 15, 17, 19, 21, 23시). 설치본은 아직 21, 23시(승인 대기).
+- 문구만: `index.html` 설정 안내, `src/push.js` 켜짐 문구, `src/main.js` 주석, README 알림 절.
+- 결정(사용자 미확인): 09시 시작(조용한 시간은 밤 11시 뒤부터 아침 9시 전), 낮 슬롯 봇 폴백 없음, 낮 문구에 가슴 펴기 질문, 조건부 해석.
+  가슴 펴기 O가 필수라 사실상 앱을 열어 다 채우기 전까지 두 시간마다 온다. 하루 첫 슬롯(9시)은 보고가 없어 늘 온다.
+- API 재시작은 필요 없다: HTTP 핸들러는 `reminders` 테이블을 읽지 않고, `remind`는 launchd 가 매 슬롯 작업 트리의 새 코드로 새로 실행한다.
+- 운영 DB 이행: 사본(`data/reminders.sqlite3` 복사)에서 `status`, `remind --dry-run`(13시 routine would_send, bot false), `--kind reflection` 확인 뒤
+  운영 DB에 `status`를 실행해 이행 적용(아래 검증). 이행 전 reminders 행은 0건이었다(그동안 not_paired 로 기록 없음).
+
+## 검증
+
+- `PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -m unittest discover -s scripts -p 'test_*.py'`: 21건(기존 18 + 슬롯 반복과 중단, 낮 슬롯 봇 없음, 2026-10 스키마 이행).
+- `npm test` 315건, `npm run build` 통과(문구 변경). 브라우저 QA 는 문구 단언이 없어 생략.
+- `plutil -lint` OK.
+
+## 운영 반영 (승인 대기)
+
+1. reminder plist 교체(bootout → cp → bootstrap): 9시부터 23시까지 두 시간 간격. 이것 없이는 21시, 23시에만 돈다(코드는 두 시각을 그대로 지원).
+2. `npm run deploy` + `git push origin main`: 앱 안의 알림 안내 문구. 배포 직후 Pages CDN 이 몇 분간 옛 번들을 내보내므로 스모크 전에 서빙 번들 확인.
+
+---
+
 # 가슴 펴기 일간 체크 추가 — 2026-11-03
 
 ## 현재 작업

@@ -152,7 +152,7 @@ export function pushStatusText(status, connected) {
   if (status === 'unsupported') return '이 브라우저는 앱 알림을 지원하지 않습니다. 연결하면 메인컨트롤 봇이 대신 알립니다.';
   if (status === 'denied') return '알림 권한이 꺼져 있습니다. iOS 설정의 알림에서 H2 루틴을 허용한 뒤 다시 켜주세요.';
   if (status === 'working') return '알림 설정 중…';
-  if (status === 'enabled') return '이 기기로 앱 알림이 옵니다. 밤 9시 루틴 미달, 밤 11시 만족도 미응답 때 한 번씩.';
+  if (status === 'enabled') return '이 기기로 앱 알림이 옵니다. 오전 9시부터 밤 9시까지 두 시간마다 루틴 미달 때, 밤 11시 만족도 미응답 때.';
   if (!connected) return '연결하면 이 기기로 앱 알림이 옵니다. 연결 전에는 알리지 않습니다.';
   return '이 기기 앱 알림 꺼짐. 켜기 전까지는 메인컨트롤 봇이 대신 알립니다.';
 }
