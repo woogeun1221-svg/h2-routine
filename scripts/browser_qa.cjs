@@ -93,9 +93,11 @@ async function v2Scenario(browser, origin) {
   assert((await page.locator('#planInherit').innerText()).includes('전부 아침'));
   await ttCell('2026-11-09', 'noon').click();
   await ttCell('2026-11-10', 'run').click();
+  const stampBeforeMemo = (await stored()).plans['2026-11-09'].u;
   await page.locator('#planMemos input[data-day="2026-11-09"]').fill('송은 회식');
   saved = await stored();
   const { u: planStamp, ...plan46 } = saved.plans['2026-11-09'];
+  assert.equal(planStamp, stampBeforeMemo);                         // 메모는 서버로 안 가서 u를 바꾸지 않는다
   assert.deepEqual(plan46, { 1: 'noon', 2: 'run', 3: 'am', 4: 'am', 5: 'am', m1: '송은 회식' });
   assert.equal(typeof planStamp, 'number');                        // 봇 동기화의 주 단위 마지막 수정 시각
   assert.equal(await ttCell('2026-11-09', 'noon').locator('.tt-block').getAttribute('class'), 'tt-block plan');

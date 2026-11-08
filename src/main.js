@@ -213,7 +213,8 @@ function ownPlan(monday) {
   }
   return state.plans[monday];
 }
-/* u = 마지막 수정 시각(밀리초). 봇 동기화에서 주 단위로 더 최근 쪽이 이긴다(botsync.js). */
+/* u = 슬롯을 마지막으로 바꾼 시각(밀리초). 봇 동기화에서 주 단위로 더 최근 쪽이 이긴다(botsync.js).
+   메모는 서버로 가지 않으므로 u를 바꾸지 않는다(메모를 쓰는 사이 도착한 봇 계획을 막지 않게). */
 function setPlanSlot(monday, wd, slot) {
   if (!isSlot(slot) || wd < 1 || wd > 5) return;
   var plan = ownPlan(monday);
@@ -224,7 +225,6 @@ function setPlanMemo(monday, wd, text) {
   if (wd < 1 || wd > 5) return;
   var plan = ownPlan(monday);
   if (text) plan['m' + wd] = text; else delete plan['m' + wd];
-  plan.u = Date.now();
   save(); // 입력 중 재렌더하지 않아 한글 조합과 커서를 보존한다.
 }
 function setPlanOffset(offset) {
