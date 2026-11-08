@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0F1317">
+<meta name="theme-color" content="#0B0C0E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="H2 루틴">
@@ -24,10 +24,10 @@
     <!-- ================= 오늘 ================= -->
     <div id="screen-today">
       <div class="date-row">
-        <h1 class="date"><span id="dateStr"></span><span class="dplus wkno" id="weekNo"></span><span class="dplus" id="dplus"></span></h1>
+        <h1 class="date"><span id="dateStr"></span><span class="date-meta"><span class="dplus wkno" id="weekNo"></span><span class="dplus" id="dplus"></span></span></h1>
         <div class="day-nav" role="group" aria-label="기록 날짜 이동">
-          <button class="btn nav-btn" id="dayPrev" aria-label="전날 기록">◀&#xFE0E;</button>
-          <button class="btn nav-btn" id="dayNext" aria-label="다음날 기록">▶&#xFE0E;</button>
+          <button class="icon-btn" id="dayPrev" aria-label="전날 기록">‹</button>
+          <button class="icon-btn" id="dayNext" aria-label="다음날 기록">›</button>
         </div>
       </div>
       <div class="edit-notice" id="editNotice">
@@ -43,7 +43,7 @@
       </div>
 
       <div class="banner" id="banner">
-        <b id="bannerHead">어제 미달.</b> 오늘은 거를 수 없는 날 — 최소 포지션(<span id="bannerMins">30, 5, 5</span>, 가슴 펴기와 송은 룰 포함)은 무조건 채운다.
+        <b id="bannerHead">어제 미달.</b> 오늘은 거를 수 없는 날. 최소 포지션(<span id="bannerMins">30, 5, 5</span>, 가슴 펴기와 송은 룰 포함)은 무조건 채운다.
       </div>
 
       <!-- v2 운동 슬롯: 평일 정상 조건. 카드 목록(#cards) 밖에 둬서 카드 수 단언과 섞이지 않는다 -->
@@ -67,27 +67,46 @@
       <div class="rule-note">
         <b>정상 포지션</b> <span id="goalFullNums">100, 20, 20</span> &nbsp;/&nbsp; <b>최소 포지션</b> <span id="goalMinNums">30, 5, 5</span><br>
         <b>운동 슬롯 룰</b> 평일은 시간표의 슬롯 하나(아침, 점심, 저녁런닝)를 해야 정상이다. 비우면 그날은 최소 포지션까지만. 주말은 송은 시간이라 슬롯 조건이 없다.<br>
-        <b>송은 룰</b> 짜증이 올라오면 — 해결 먼저, 감정은 나중. X는 그 자체로 그날 미달이다.<br>
+        <b>송은 룰</b> 짜증이 올라오면 해결 먼저, 감정은 나중. X는 그 자체로 그날 미달이다.<br>
         <b>가슴 펴기 룰</b> 하루 내내 가슴을 당당히 펴고 있는가. 저녁에 O를 눌러야 그날 통과이고, X나 미응답은 그날 미달이다.<br>
-        <b>투자 원칙 룰</b> 매주 한 번 정독·검토. 언제든 체크할 수 있고 목·금을 권장한다. 금요일까지 미완료면 그날 미달이다.<br>
+        <b>투자 원칙 룰</b> 매주 한 번 정독하고 검토한다. 언제든 체크할 수 있고 목요일이나 금요일을 권장한다. 금요일까지 미완료면 그날 미달이다.<br>
         <b>손익비 스냅샷 룰</b> 매주 한 번 포트폴리오 손익비 스냅샷을 찍는다. 투자 원칙과 별개로 세고, 금요일까지 미완료면 그날 미달이다.<br>
-        룰은 하나. <b>두 번 연속 거르지 않는다.</b> 흩뿌려도 된다 — 20×5도 100이다.<br>
-        빠뜨린 날은 위의 ◀ ▶ 나 14일 칸으로 돌아가 채운다. 수치만 고쳐지고 판정 기준은 그날 기준 그대로다.
+        룰은 하나. <b>두 번 연속 거르지 않는다.</b> 흩뿌려도 된다. 20×5도 100이다.<br>
+        빠뜨린 날은 위의 ‹ › 나 14일 칸으로 돌아가 채운다. 수치만 고쳐지고 판정 기준은 그날 기준 그대로다.
       </div>
     </div>
 
-    <!-- ================= 시간표 (v2 주간 운동 시간표) ================= -->
+    <!-- ================= 시간표 (v2: 주간 시간표와 일간 시간축) ================= -->
     <div id="screen-plan" style="display:none">
-      <div class="plan-head">
-        <span class="strip-title">주간 운동 시간표</span>
-        <span class="plan-hint">실제로 한 슬롯은 오늘 화면에서 누른다</span>
+      <div class="screen-head">
+        <h2 class="screen-title">시간표</h2>
+        <div class="seg seg-mini" id="planModes" role="group" aria-label="시간표 보기">
+          <button type="button" class="seg-btn" data-mode="day" aria-pressed="false">일간</button>
+          <button type="button" class="seg-btn on" data-mode="week" aria-pressed="true">주간</button>
+        </div>
       </div>
-      <div class="btns seg plan-weeks" id="planWeeks" role="group" aria-label="주 선택"></div>
-      <p class="plan-inherit" id="planInherit" hidden></p>
-      <div class="plan-ledger" id="planRows"></div>
-      <div class="plan-foot">
-        <span class="plan-count mono" id="planCount"></span>
-        <span class="plan-caption">아침 슬롯의 전제는 전날 23시 취침.</span>
+
+      <div id="planWeekView">
+        <div class="seg week-seg" id="planWeeks" role="group" aria-label="주 선택"></div>
+        <p class="plan-inherit" id="planInherit" hidden></p>
+        <div class="tt-card"><div class="tt-grid" id="planGrid"></div></div>
+        <div class="tt-legend" aria-hidden="true">
+          <span><i class="lg plan"></i>계획</span><span><i class="lg done"></i>완료</span>
+          <span><i class="lg miss"></i>비었음</span><span><i class="lg ghost"></i>옮김</span>
+        </div>
+        <div class="section-head"><span class="section-title">메모</span><span class="section-note">이 기기에만 저장</span></div>
+        <div class="memo-list" id="planMemos"></div>
+        <div class="plan-foot">
+          <span class="plan-count" id="planCount"></span>
+          <span class="plan-caption">칸을 누르면 그날 계획이 옮겨 간다. 날짜를 누르면 일간 보기. 아침 슬롯의 전제는 전날 23시 취침.</span>
+        </div>
+      </div>
+
+      <div id="planDayView" hidden>
+        <div class="day-head" id="planDayHead"></div>
+        <div class="day-memo" id="planDayMemo"></div>
+        <div class="tl-card"><div class="tl" id="planTimeline"></div></div>
+        <div class="day-status-wrap" id="planDayStatus"></div>
       </div>
     </div>
 
@@ -109,9 +128,9 @@
         </div>
         <div class="cal-card">
           <div class="cal-head">
-            <button class="btn cal-nav" id="calPrev" aria-label="이전 달">◀&#xFE0E;</button>
-            <span class="cal-label mono" id="calLabel"></span>
-            <button class="btn cal-nav" id="calNext" aria-label="다음 달">▶&#xFE0E;</button>
+            <button class="icon-btn cal-nav" id="calPrev" aria-label="이전 달">‹</button>
+            <span class="cal-label num" id="calLabel"></span>
+            <button class="icon-btn cal-nav" id="calNext" aria-label="다음 달">›</button>
           </div>
           <div class="cal-wd" id="calWd"></div>
           <div class="cal-grid" id="calGrid"></div>
@@ -163,8 +182,10 @@
       <div class="settings-section">
         <div class="strip-head"><span class="strip-title">알림</span></div>
         <p class="settings-note">오전 9시부터 밤 9시까지 두 시간마다 오늘 루틴이 아직 미달이면, 밤 11시에 하루 만족도가 미응답이면 알립니다. 홈 화면 앱에서 알림을 켜면 이 기기로 오고, 켜지 않으면 밤 9시와 11시만 메인컨트롤 봇이 대신 알립니다.</p>
+        <p class="settings-note">연결된 기기는 시간표 슬롯과 오늘 포지션(정상, 최소, 미달과 남은 항목)을 메인컨트롤 봇과 주고받습니다. 봇 DM에서 <b>/오늘</b>, <b>/시간표</b>, <b>/슬롯 화 점심</b>. 봇에서 바꾼 계획은 앱을 열 때 들어옵니다. 메모와 만족도 사유는 보내지 않습니다.</p>
         <p id="pushStatus" class="settings-note" role="status"></p>
         <p id="reminderSettingsStatus" class="settings-note" role="status"></p>
+        <p id="botSyncStatus" class="settings-note" role="status"></p>
         <form id="reminderConnectForm" class="reminder-connect">
           <label for="reminderConnectCode">봇이 보낸 연결 링크 또는 코드</label>
           <input id="reminderConnectCode" type="password" autocomplete="off" spellcheck="false">
@@ -182,8 +203,8 @@
         </div>
         <div class="goal-card" id="goalRows"></div>
         <div class="settings-note">
-          목표를 바꾸면 <b>과거 기록의 판정도 새 기준으로 재평가</b>된다 — 목표 이력은 관리하지 않는다.
-          스트릭·정상률·장부가 모두 다시 계산된다.
+          목표를 바꾸면 <b>과거 기록의 판정도 새 기준으로 재평가</b>된다. 목표 이력은 관리하지 않는다.
+          스트릭, 정상률, 장부가 모두 다시 계산된다.
         </div>
       </div>
 
@@ -218,11 +239,11 @@
 </div>
 
 <nav class="tabbar" id="tabbar" style="display:none">
-  <button class="tab active" data-tab="today">오늘</button>
-  <button class="tab" data-tab="plan">시간표</button>
-  <button class="tab" data-tab="trends">추이</button>
-  <button class="tab" data-tab="iron">헬스</button>
-  <button class="tab" data-tab="settings">설정</button>
+  <button class="tab active" data-tab="today"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2.1M12 19.1v2.1M2.8 12h2.1M19.1 12h2.1M5.5 5.5 7 7M17 17l1.5 1.5M5.5 18.5 7 17M17 7l1.5-1.5"/></svg><span>오늘</span></button>
+  <button class="tab" data-tab="plan"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="16" rx="3"/><path d="M3.5 9.5h17M9.2 9.5v11M14.8 9.5v11M8 2.8v3.4M16 2.8v3.4"/></svg><span>시간표</span></button>
+  <button class="tab" data-tab="trends"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5h17"/><rect x="5.5" y="11" width="3" height="6.5" rx="1"/><rect x="10.5" y="5.5" width="3" height="12" rx="1"/><rect x="15.5" y="13.5" width="3" height="4" rx="1"/></svg><span>추이</span></button>
+  <button class="tab" data-tab="iron"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="7" width="3.2" height="10" rx="1.2"/><rect x="16.3" y="7" width="3.2" height="10" rx="1.2"/><path d="M7.7 12h8.6M2.5 10v4M21.5 10v4"/></svg><span>헬스</span></button>
+  <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h8.5M17.5 7.5H20M4 16.5h2.5M11.5 16.5H20"/><circle cx="15" cy="7.5" r="2.5"/><circle cx="9" cy="16.5" r="2.5"/></svg><span>설정</span></button>
 </nav>
 
 <script type="module" src="/src/main.js"></script>

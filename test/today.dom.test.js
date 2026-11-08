@@ -173,7 +173,7 @@ describe('renderToday DOM 스모크', () => {
     const wedState = { startDate: '2026-08-01', investmentReviewStart: '2026-08-19', days: {} };
     renderToday(wedState, '2026-08-19', h);
     const button = document.querySelector('.weekly-btn');
-    expect(button.textContent).toBe('정독·검토 완료');
+    expect(button.textContent).toBe('정독, 검토 완료');
     expect(button.disabled).toBe(false);
     button.click();
     expect(clicked).toBe(1);

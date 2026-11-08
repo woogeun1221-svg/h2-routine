@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """루틴 미달, 하루 만족도 미응답 알림. 표준 라이브러리, 기존 tg-notify, Node 내장 crypto(web_push.cjs)만 사용한다.
 
-DB에는 기기 인증정보의 해시, 날짜별 응답 여부와 루틴 충족 여부(불리언), 푸시 구독만 저장한다.
-O/X 선택값, X의 이유, 운동 수치는 수신하지 않는다.
+DB에는 기기 인증정보의 해시, 날짜별 응답 여부와 루틴 충족 여부(불리언), 푸시 구독,
+메인컨트롤 봇 동기화(2026-11-08)용 시간표 슬롯과 날짜별 요약(포지션, 남은 항목 문구, 계획과 실제 슬롯)을 저장한다.
+O/X 선택값, X의 이유, 메모(송은 일정), 운동 수치 원본은 수신하지 않는다.
 
 알림 종류(한국 시간, launchd StartCalendarInterval 과 같은 SCHEDULE):
   routine     09:00 부터 21:00 까지 두 시간마다. 어느 기기도 오늘 루틴이 최소 포지션 이상이라고 보고하지 않았으면 슬롯마다 한 번
   reflection  23:00. 어느 기기도 오늘 만족도 응답을 보고하지 않았으면 한 번
 전달: 푸시 구독이 있으면 Web Push. 구독이 없거나 모두 실패하면 21:00 과 23:00(BOT_HOURS)만 메인컨트롤 봇 DM, 낮 슬롯은 건너뛴다.
+
+메인컨트롤 봇과 주고받기(routine_bot.py): 앱은 POST /state 로 요약과 계획 슬롯을 보내고 서버의 최근 계획을 받는다.
+봇 DM 의 /오늘, /시간표, /슬롯 은 alphasense 웹훅이 `reminder_service.py bot` 으로 넘기고,
+일요일 20시엔 `weekly`(launchd com.woogeun.routine.weekly)가 다음 주 시간표를 보낸다.
 """
 from __future__ import annotations
 
@@ -27,6 +32,8 @@ import subprocess
 import sys
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
+
+import routine_bot
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB = ROOT / 'data' / 'reminders.sqlite3'
@@ -58,6 +65,68 @@ def send_message(message):
     )
     # Telegram 응답·인증정보·연결 링크를 운영 로그에 남기지 않는다.
     return result.returncode == 0
+
+
+SUMMARY_KEYS = {'status', 'planned', 'actual', 'slotRequired', 'full', 'min', 'wifeX'}
+
+
+def _iso_day(value):
+    if not isinstance(value, str):
+        raise ValueError('day')
+    day = date.fromisoformat(value)
+    if day.isoformat() != value:
+        raise ValueError('day')
+    return day
+
+
+def parse_state(payload, today):
+    """앱 POST /state → {'days', 'plans', 'slotStart'?}. 형식이 아니면 ValueError.
+    days: 오늘 기준 7일 전부터 내일까지 최대 3일, plans: 월요일 키 최대 8주(오늘 기준 6주 안), u 는 0 이상 밀리초."""
+    if not isinstance(payload, dict) or not set(payload) <= {'today', 'days', 'plans', 'slotStart'}:
+        raise ValueError('keys')
+    if abs((_iso_day(payload.get('today')) - today).days) > 1:
+        raise ValueError('today')
+    days, plans = payload.get('days', {}), payload.get('plans', {})
+    if not isinstance(days, dict) or len(days) > 3 or not isinstance(plans, dict) or len(plans) > 8:
+        raise ValueError('size')
+    out = {'days': {}, 'plans': {}}
+    for key, value in days.items():
+        day = _iso_day(key)
+        if not today - timedelta(days=7) <= day <= today + timedelta(days=1):
+            raise ValueError('day range')
+        if not isinstance(value, dict) or not set(value) <= SUMMARY_KEYS or value.get('status') not in routine_bot.POSITION:
+            raise ValueError('summary')
+        for slot_key in ('planned', 'actual'):
+            if value.get(slot_key) is not None and value.get(slot_key) not in routine_bot.SLOTS:
+                raise ValueError(slot_key)
+        for flag in ('slotRequired', 'wifeX'):
+            if flag in value and type(value[flag]) is not bool:
+                raise ValueError(flag)
+        for gap_key in ('full', 'min'):
+            items = value.get(gap_key, [])
+            if (not isinstance(items, list) or len(items) > 12
+                    or any(not isinstance(item, str) or len(item) > 40 for item in items)):
+                raise ValueError(gap_key)
+        out['days'][key] = {'status': value['status'], 'planned': value.get('planned'), 'actual': value.get('actual'),
+                            'slotRequired': bool(value.get('slotRequired')), 'full': list(value.get('full', [])),
+                            'min': list(value.get('min', [])), 'wifeX': bool(value.get('wifeX'))}
+    for key, value in plans.items():
+        monday = _iso_day(key)
+        if monday.weekday() != 0 or abs((monday - today).days) > 42:
+            raise ValueError('monday')
+        if not isinstance(value, dict) or not set(value) <= {'1', '2', '3', '4', '5', 'u'}:
+            raise ValueError('plan')
+        u = value.get('u')
+        if type(u) not in (int, float) or u != u or u < 0 or u > 2 ** 53:
+            raise ValueError('u')
+        slots = {str(i): value.get(str(i)) for i in range(1, 6)}
+        if any(slot not in routine_bot.SLOTS for slot in slots.values()):
+            raise ValueError('slot')
+        out['plans'][key] = {'slots': slots, 'u': int(u)}
+    if 'slotStart' in payload:
+        start = payload['slotStart']
+        out['slotStart'] = None if start is None else _iso_day(start).isoformat()
+    return out
 
 
 def parse_subscription(value):
@@ -103,6 +172,16 @@ class Store:
                 CREATE TABLE IF NOT EXISTS subscriptions (
                     endpoint TEXT PRIMARY KEY, device TEXT NOT NULL, p256dh TEXT NOT NULL,
                     auth TEXT NOT NULL, created TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS plans (
+                    monday TEXT PRIMARY KEY, slots TEXT NOT NULL, u INTEGER NOT NULL,
+                    source TEXT NOT NULL, updated TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS summaries (
+                    day TEXT PRIMARY KEY, data TEXT NOT NULL, updated TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS meta (
+                    key TEXT PRIMARY KEY, value TEXT, updated TEXT NOT NULL
                 );
             ''')
             self.migrate(db)
@@ -206,6 +285,90 @@ class Store:
             rows = db.execute('SELECT endpoint, p256dh, auth FROM subscriptions ORDER BY created').fetchall()
         return [{'endpoint': r[0], 'p256dh': r[1], 'auth': r[2]} for r in rows]
 
+    # ---------- 메인컨트롤 봇 동기화: 시간표 슬롯과 날짜별 요약(2026-11-08) ----------
+    def save_state(self, token, data, now=None):
+        """앱이 보낸 요약과 계획 저장. 계획은 주 단위로 u(밀리초)가 큰 쪽이 이기고, 같으면 앱 것이 이긴다
+        (물려받은 계획 u=0 은 앞 주 계획이 바뀌면 내용이 달라지므로 앱이 다시 보낸 것으로 바꾼다).
+        봇이 쓴 계획은 u 가 지금 시각이라 늦게 도착한 앱의 옛 계획에 덮이지 않는다."""
+        now = now or now_kst()
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if not db.execute('SELECT 1 FROM devices WHERE token_hash = ?', (digest(token),)).fetchone():
+                raise PermissionError('invalid device')
+            for day, summary in data['days'].items():
+                db.execute('''INSERT INTO summaries VALUES (?, ?, ?)
+                    ON CONFLICT(day) DO UPDATE SET data=excluded.data, updated=excluded.updated''',
+                           (day, json.dumps(summary, ensure_ascii=False), now.isoformat()))
+            for monday, plan in data['plans'].items():
+                row = db.execute('SELECT u, source FROM plans WHERE monday = ?', (monday,)).fetchone()
+                if row is None or plan['u'] > row[0] or (plan['u'] == row[0] and row[1] == 'app'):
+                    db.execute('''INSERT INTO plans VALUES (?, ?, ?, 'app', ?)
+                        ON CONFLICT(monday) DO UPDATE SET slots=excluded.slots, u=excluded.u,
+                        source=excluded.source, updated=excluded.updated''',
+                               (monday, json.dumps(plan['slots']), plan['u'], now.isoformat()))
+            if 'slotStart' in data:
+                db.execute('''INSERT INTO meta VALUES ('slotStart', ?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated=excluded.updated''',
+                           (data['slotStart'], now.isoformat()))
+
+    def recent_plans(self, today):
+        """지난주부터의 계획 — /state 응답. {월요일: {'1'..'5': 슬롯, 'u': 밀리초}}"""
+        since = (routine_bot.monday_of(today) - timedelta(days=7)).isoformat()
+        with self.connect() as db:
+            rows = db.execute('SELECT monday, slots, u FROM plans WHERE monday >= ? ORDER BY monday', (since,)).fetchall()
+        return {monday: dict(json.loads(slots), u=u) for monday, slots, u in rows}
+
+    @staticmethod
+    def _plan_slots(row):
+        slots = json.loads(row[0]) if row else {}
+        return {str(i): slots.get(str(i)) if slots.get(str(i)) in routine_bot.SLOTS else 'am' for i in range(1, 6)}
+
+    def effective_plan(self, monday):
+        """앱의 planFor 와 같다: 그 주 계획, 없으면 그 전 가장 가까운 주의 슬롯, 그것도 없으면 전부 아침.
+        반환 ({'1'..'5': 슬롯}, 그 주 계획이 있는가)"""
+        with self.connect() as db:
+            row = db.execute('SELECT slots, monday FROM plans WHERE monday <= ? ORDER BY monday DESC LIMIT 1',
+                             (monday,)).fetchone()
+        return self._plan_slots(row), bool(row and row[1] == monday)
+
+    def set_plan_slots(self, monday, changes, now=None):
+        """봇 /슬롯 — 그 주 계획(없으면 물려받은 슬롯을 복사)에서 changes {요일번호: 슬롯} 을 바꾸고 u=지금으로 쓴다."""
+        now = now or now_kst()
+        now_ms = int(now.timestamp() * 1000)
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT slots FROM plans WHERE monday <= ? ORDER BY monday DESC LIMIT 1', (monday,)).fetchone()
+            plan = self._plan_slots(row)
+            for wd, slot in changes.items():
+                plan[str(wd)] = slot
+            own = db.execute('SELECT u FROM plans WHERE monday = ?', (monday,)).fetchone()
+            u = max(now_ms, own[0] + 1) if own else now_ms
+            db.execute('''INSERT INTO plans VALUES (?, ?, ?, 'bot', ?)
+                ON CONFLICT(monday) DO UPDATE SET slots=excluded.slots, u=excluded.u,
+                source=excluded.source, updated=excluded.updated''',
+                       (monday, json.dumps(plan), u, now.isoformat()))
+        return plan, u
+
+    def has_plan_before(self, monday):
+        with self.connect() as db:
+            return db.execute('SELECT 1 FROM plans WHERE monday < ? LIMIT 1', (monday,)).fetchone() is not None
+
+    def summary(self, day):
+        """(요약 dict, 받은 시각 iso) 또는 (None, None)"""
+        with self.connect() as db:
+            row = db.execute('SELECT data, updated FROM summaries WHERE day = ?', (day,)).fetchone()
+        return (json.loads(row[0]), row[1]) if row else (None, None)
+
+    def last_summary_day(self):
+        with self.connect() as db:
+            row = db.execute('SELECT MAX(day) FROM summaries').fetchone()
+        return row[0] if row else None
+
+    def meta(self, key):
+        with self.connect() as db:
+            row = db.execute('SELECT value FROM meta WHERE key = ?', (key,)).fetchone()
+        return row[0] if row else None
+
     def state(self, day):
         with self.connect() as db:
             paired = db.execute('SELECT COUNT(*) FROM devices').fetchone()[0]
@@ -274,25 +437,26 @@ def hour_label(hour):
     return f'밤 {hour - 12}시'
 
 
-def routine_body(now, casual=False):
-    """낮 슬롯은 가슴 펴기 질문으로 시작하고, 21시는 자기 전 마지막 재촉. casual 은 봇 DM 말투."""
+def routine_body(now, casual=False, hint=''):
+    """낮 슬롯은 가슴 펴기 질문으로 시작하고, 21시는 자기 전 마지막 재촉. casual 은 봇 DM 말투.
+    hint 는 오늘 계획 운동 슬롯이 아직 남았을 때의 한 줄(routine_bot.reminder_hint)."""
     miss = '미달이야' if casual else '미달이다'
     if now.hour >= 21:
         return f'밤 9시. 오늘 루틴이 아직 {miss}. 최소 포지션이라도 채우고 자자. 두 번 연속 거르지 않는다.' + friday_note(now)
     return (f'{hour_label(now.hour)}. 가슴을 당당히 펴고 있는가? 오늘 루틴은 아직 {miss}. 지금 한 포지션이라도 쌓자.'
-            + friday_note(now))
+            + hint + friday_note(now))
 
 
-def push_payload(kind, day, now):
+def push_payload(kind, day, now, hint=''):
     if kind == 'routine':
-        return {'title': 'H2 루틴', 'tag': 'h2-routine-routine', 'url': SITE, 'body': routine_body(now)}
+        return {'title': 'H2 루틴', 'tag': 'h2-routine-routine', 'url': SITE, 'body': routine_body(now, hint=hint)}
     return {'title': '하루 만족도', 'tag': 'h2-routine-reflection', 'url': SITE,
             'body': '아직 오늘의 O/X를 안 골랐다. 스스로에게 만족할만한 하루를 보냈는가? O든 X든 직접 고르고, X라면 이유도 남기자.'}
 
 
-def telegram_text(kind, day, now):
+def telegram_text(kind, day, now, hint=''):
     if kind == 'routine':
-        return f'{day} ' + routine_body(now, casual=True) + '\n' + SITE
+        return f'{day} ' + routine_body(now, casual=True, hint=hint) + '\n' + SITE
     return (
         f'{day} 아직 오늘의 O/X를 안 골랐네. 왜 미뤄두고 있어?\n\n'
         '스스로에게 만족할만한 하루를 보냈는가? 컨트롤 할 수 있는 건 오로지 나뿐.\n\n'
@@ -309,14 +473,14 @@ def kind_for(now):
     return SCHEDULE.get(now.hour)
 
 
-def deliver(store, kind, day, now, sender, pusher, bot=True):
+def deliver(store, kind, day, now, sender, pusher, bot=True, hint=''):
     """푸시 구독이 있으면 푸시. 없거나 전부 실패하면 bot 슬롯(21시, 23시)만 메인컨트롤 봇, 낮 슬롯은 건너뛴다(skipped, failed).
     끊긴 구독(404, 410)은 지운다."""
     subscriptions = store.subscriptions()
     pushed = False
     if subscriptions:
         try:
-            results = pusher(subscriptions, push_payload(kind, day, now))
+            results = pusher(subscriptions, push_payload(kind, day, now, hint))
         except Exception:
             results = []
         gone = [r['endpoint'] for r in results if r.get('status') in (404, 410)]
@@ -328,7 +492,7 @@ def deliver(store, kind, day, now, sender, pusher, bot=True):
     if not bot:
         return ('failed', 'push') if pushed else ('skipped', None)
     try:
-        return ('sent' if sender(telegram_text(kind, day, now)) else 'failed'), 'telegram'
+        return ('sent' if sender(telegram_text(kind, day, now, hint)) else 'failed'), 'telegram'
     except Exception:
         return 'failed', 'telegram'
 
@@ -365,7 +529,11 @@ def remind(store, *, now=None, kind=None, sender=send_message, pusher=send_push,
     if current[skip]:
         status = skip
     else:
-        status, channel = deliver(store, kind, day, now, sender, pusher, bot=slot in BOT_HOURS)
+        try:
+            hint = routine_bot.reminder_hint(store, now) if kind == 'routine' else ''
+        except Exception:  # 슬롯 한 줄을 못 만들어도 알림은 간다
+            hint = ''
+        status, channel = deliver(store, kind, day, now, sender, pusher, bot=slot in BOT_HOURS, hint=hint)
     with store.connect() as db:
         db.execute('UPDATE reminders SET status = ?, updated = ? WHERE day = ? AND kind = ? AND slot = ?',
                    (status, now_kst().isoformat(), day, kind, slot))
@@ -442,8 +610,25 @@ def handler_for(store, vapid_file=VAPID_FILE):
                 self.handle_subscribe(payload)
             elif path == '/push/unsubscribe':
                 self.handle_unsubscribe(payload)
+            elif path == '/state':
+                self.handle_state(payload)
             else:
                 self.reply(404, {'error': 'not_found'})
+
+        def handle_state(self, payload):
+            """메인컨트롤 봇 동기화 — 요약과 계획 슬롯을 받고 서버의 최근 계획(봇에서 바꾼 것 포함)을 돌려준다."""
+            token = self.device_token()
+            if not token:
+                self.reply(401, {'error': 'unauthorized'})
+                return
+            today = now_kst().date()
+            try:
+                data = parse_state(payload, today)
+            except (ValueError, TypeError, KeyError):
+                self.reply(400, {'error': 'invalid_state'})
+                return
+            store.save_state(token, data)
+            self.reply(200, {'ok': True, 'plans': store.recent_plans(today)})
 
         def handle_pair(self, payload):
             code = payload.get('code')
@@ -525,6 +710,39 @@ def pairing_message(code):
     )
 
 
+def send_weekly(store, *, now=None, sender=send_message, dry_run=False):
+    """일요일 20시 다음 주 시간표를 메인컨트롤 봇 DM 으로. 연결된 기기가 있고 최근 14일 안에 앱 요약이 들어왔을 때만,
+    같은 날 한 번(reminders 표의 kind='weekly'). 앱을 안 쓰는 동안 옛 계획을 계속 보내지 않는다."""
+    now = (now or now_kst()).astimezone(KST)
+    day = now.date().isoformat()
+    with store.connect() as db:
+        db.execute('BEGIN IMMEDIATE')
+        if not db.execute('SELECT 1 FROM devices LIMIT 1').fetchone():
+            return {'action': 'not_paired', 'day': day}
+        last = db.execute('SELECT MAX(day) FROM summaries').fetchone()[0]
+        if not last or (now.date() - date.fromisoformat(last)).days > 14:
+            return {'action': 'app_idle', 'day': day}
+        old = db.execute("SELECT status FROM reminders WHERE day = ? AND kind = 'weekly' AND slot = 0", (day,)).fetchone()
+        if old and old[0] in ('sending', 'sent'):
+            return {'action': 'already_attempted', 'day': day}
+        if not dry_run:
+            db.execute('''INSERT INTO reminders VALUES (?, 'weekly', 0, 'sending', ?)
+                ON CONFLICT(day, kind, slot) DO UPDATE SET status='sending', updated=excluded.updated''',
+                       (day, now.isoformat()))
+    text = routine_bot.weekly_text(store, now)
+    if dry_run:
+        return {'action': 'would_send', 'day': day, 'text': text}
+    try:
+        ok = sender(text)
+    except Exception:
+        ok = False
+    status = 'sent' if ok else 'failed'
+    with store.connect() as db:
+        db.execute("UPDATE reminders SET status = ?, updated = ? WHERE day = ? AND kind = 'weekly' AND slot = 0",
+                   (status, now_kst().isoformat(), day))
+    return {'action': status, 'day': day}
+
+
 def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
@@ -539,6 +757,9 @@ def main():
     commands.add_parser('pair')
     commands.add_parser('status')
     commands.add_parser('push-test', help='연결된 모든 푸시 구독에 확인용 알림을 보낸다')
+    commands.add_parser('bot', help='메인컨트롤 DM 루틴 명령(표준입력) → {"reply": 문구}. alphasense 웹훅이 부른다')
+    weekly = commands.add_parser('weekly', help='다음 주 시간표를 메인컨트롤 봇 DM 으로 보낸다(일요일 20시 launchd)')
+    weekly.add_argument('--dry-run', action='store_true')
     args = parser.parse_args()
     store = Store(args.db)
     if args.command == 'serve':
@@ -570,6 +791,14 @@ def main():
         statuses = [r.get('status') for r in results]
         print(json.dumps({'sent': sum(1 for s in statuses if 200 <= int(s or 0) < 300), 'statuses': statuses, 'dropped': len(gone)}))
         return 0 if any(200 <= int(s or 0) < 300 for s in statuses) else 1
+    elif args.command == 'bot':
+        # 입출력은 바이트로 다룬다 — 웹훅이 최소 환경(로캘 없음)으로 불러도 한글이 깨지지 않게, 출력은 ASCII JSON.
+        text = sys.stdin.buffer.read(4096).decode('utf-8', 'replace')
+        sys.stdout.write(json.dumps({'reply': routine_bot.bot_reply(store, text)}) + '\n')
+    elif args.command == 'weekly':
+        result = send_weekly(store, dry_run=args.dry_run)
+        print(json.dumps(result))
+        return 1 if result['action'] == 'failed' else 0
     else:
         print(json.dumps(store.state(now_kst().date().isoformat())))
     return 0

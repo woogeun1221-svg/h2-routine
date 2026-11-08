@@ -32,7 +32,7 @@ describe('만족도 추이와 아카이브', () => {
   it('전체 사유를 읽을 수 있는 파일로 내보내며 다른 루틴과 미래 기록은 제외한다', () => {
     const text = reflectionArchiveText(state, '2026-09-17');
     expect(text).toContain('전체 3건');
-    expect(text).toContain('현재 O · 보관된 X 사유');
+    expect(text).toContain('현재 O, 보관된 X 사유');
     expect(text).toContain('> 지난달의 사유\n> 두 번째 문장');
     expect(text).toContain('사유를 아직 적지 않았습니다.');
     expect(text).not.toContain('미래 날짜');

@@ -65,7 +65,7 @@ function renderCalendar(state, t, ym, mode) {
       const button = document.createElement('button');
       button.type = 'button'; button.dataset.day = c.ds;
       button.className = 'cal-cell reflection-cell reflection-' + (answer || 'unanswered') + (c.ds === t ? ' today' : '');
-      button.setAttribute('aria-label', c.ds + ' · ' + (answer?.toUpperCase() || '미응답'));
+      button.setAttribute('aria-label', c.ds + ', ' + (answer?.toUpperCase() || '미응답'));
       const date = document.createElement('span'); date.textContent = c.day;
       const mark = document.createElement('b'); mark.textContent = answer?.toUpperCase() || '—';
       button.append(date, mark);
@@ -108,7 +108,7 @@ function renderHabitStats(state, t, ym) {
     tb.appendChild(tr);
   });
 
-  wife.innerHTML = '송은 — <b class="wo">O ' + stats.w.o + '</b> · <b class="wx">X ' + stats.w.x + '</b> · 해당없음 ' + stats.w.na +
+  wife.innerHTML = '송은 — <b class="wo">O ' + stats.w.o + '</b>, <b class="wx">X ' + stats.w.x + '</b>, 해당없음 ' + stats.w.na +
     ' <span class="wife-note">/ ' + stats.total + '일 확정</span>';
 }
 

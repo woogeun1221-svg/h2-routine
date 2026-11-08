@@ -1,5 +1,6 @@
-/* 봇에는 날짜, 만족도 응답 여부, 오늘 루틴이 최소 포지션 이상인지(routine)만 전송한다.
-   O/X 값, 이유, 운동 수치는 보내지 않는다. 푸시 구독은 push.js 가 이 클라이언트의 post 로 등록한다. */
+/* 알림 보고(/answer)에는 날짜, 만족도 응답 여부, 오늘 루틴이 최소 포지션 이상인지(routine)만 보낸다.
+   메인컨트롤 봇 동기화(/state, 2026-11-08)는 botsync.js 가 만든 요약(포지션, 남은 항목, 슬롯 계획)을 보낸다.
+   O/X 값, 이유, 메모, 운동 수치 원본은 어느 쪽으로도 보내지 않는다. 푸시 구독은 push.js 가 이 클라이언트의 post 로 등록한다. */
 export const REMINDER_API = 'https://macmini.taile484c7.ts.net/routine-api';
 const AUTH_KEY = 'h2-routine-reminder-auth';
 const QUEUE_KEY = 'h2-routine-reminder-queue';
@@ -108,7 +109,19 @@ export function createReminderClient({ storage = localStorage, fetcher = fetch,
     }
   }
 
-  return { connect, enqueue, flush, post, getStatus: () => status, isConnected: () => Boolean(token()) };
+  /* 메인컨트롤 봇과 시간표, 오늘 포지션 주고받기. 연결 전이면 null, 응답은 { ok, plans } */
+  async function syncState(body) {
+    const credential = token();
+    if (!credential) return null;
+    try {
+      return await request('/state', body, credential);
+    } catch (error) {
+      if (error.status === 401) report('invalid');
+      throw error;
+    }
+  }
+
+  return { connect, enqueue, flush, post, syncState, getStatus: () => status, isConnected: () => Boolean(token()) };
 }
 
 export function reminderStatusText(status, answered) {

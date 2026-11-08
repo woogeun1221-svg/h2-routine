@@ -63,7 +63,7 @@ describe('하루 만족도', () => {
     expect(document.querySelectorAll('.reflection-entry').length).toBe(2);
     expect(document.querySelector('.reflection-entry p').textContent).toContain('<img');
     expect(document.querySelector('img')).toBeNull();
-    expect(document.querySelectorAll('.reflection-entry')[1].textContent).toContain('현재 O · 보관된 사유');
+    expect(document.querySelectorAll('.reflection-entry')[1].textContent).toContain('현재 O, 보관된 사유');
     renderReflectionHistory(state, '2026-08', day);
     expect(document.querySelector('.reflection-stat b').textContent).toBe('1일');
   });

@@ -43,8 +43,8 @@ export function checksMarked(state, ds) {
    각자 startKey(활성일)부터 판정하고 day 기록에는 key=true로 완료일을 남긴다. 서로 독립이다.
    action/upcoming/open은 오늘 카드 문구, statName은 추이 표의 행 이름. */
 export const INVESTMENT_REVIEW = {
-  key: 'i', name: '투자 원칙 정독·검토', sub: '매주 1회 · 목·금 권장', startKey: 'investmentReviewStart',
-  action: '정독·검토 완료', upcoming: '목·금 권장 · 지금 미리 완료할 수 있음', open: '권장일 — 오늘 또는 내일',
+  key: 'i', name: '투자 원칙 정독, 검토', sub: '매주 1회, 목금 권장', startKey: 'investmentReviewStart',
+  action: '정독, 검토 완료', upcoming: '목금 권장, 지금 미리 완료할 수 있음', open: '권장일, 오늘 또는 내일',
   statName: '투자 원칙(주)', gap: '투자 원칙 검토'
 };
 export const RR_SNAPSHOT = {
@@ -64,6 +64,10 @@ export const SLOT_ORDER = ['am', 'noon', 'run'];
 export const SLOT_CUTOFF = { am: 10, noon: 14, run: 21 };
 export const EXERCISE_SLOT = { key: 'e', name: '운동 슬롯', startKey: 'exerciseSlotStart' };
 export function isSlot(v) { return SLOT_ORDER.indexOf(v) >= 0; }
+/* 시간표에 그리는 슬롯 창(한국 시간, 시). 끝은 컷오프와 같고 시작은 그 슬롯을 시작할 수 있는 때다.
+   하루 축은 DAY_START~DAY_END시, BEDTIME은 아침 슬롯의 전제인 취침 시각이다. 판정에는 쓰지 않는다. */
+export const SLOT_WINDOW = { am: [6, 10], noon: [12, 14], run: [18, 21] };
+export const DAY_START = 6, DAY_END = 24, BEDTIME = 23;
 
 /* 습관 하나의 유효 목표치와 활성 구간 — state.settings의 오버라이드를 HABITS 기본값 위에 적용.
    settings가 없거나 값이 이상하면 기본값 (v1 데이터 호환). since/until은 날짜 문자열 또는 null. */
@@ -140,6 +144,12 @@ export function seoulHour(now) {
   for (var i = 0; i < parts.length; i++) if (parts[i].type === 'hour') return +parts[i].value % 24;
   return 0;
 }
+/* 지금 한국 시간의 분(0~59) — 시간표의 지금 선 위치용. */
+export function seoulMinute(now) {
+  var parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', minute: '2-digit' }).formatToParts(now || new Date());
+  for (var i = 0; i < parts.length; i++) if (parts[i].type === 'minute') return +parts[i].value % 60;
+  return 0;
+}
 
 /* ---------- 주간 운동 시간표 ---------- */
 /* monday 주의 계획. 그 주 계획이 없으면 그 전 가장 가까운 주의 슬롯을 물려받고, 그것도 없으면 전부 아침.
@@ -169,7 +179,7 @@ export function slotRequired(state, ds) {
 export function defaultPlanOffset(today) { return isWeekend(today) ? 1 : 0; }
 
 /* 투자 원칙 검토 주간은 월요일 시작, 어느 날이든 한 번 완료할 수 있다.
-   금요일까지의 완료 여부로 금요일 일간 판정을 정하고, 목·금은 권장일이다.
+   금요일까지의 완료 여부로 금요일 일간 판정을 정하고, 목요일과 금요일이 권장일이다.
    startDate는 기능 활성일이라 기존 기록을 소급해 미달로 바꾸지 않는다. */
 export function investmentReviewWindow(ds) {
   var p = ds.split('-');
@@ -386,7 +396,7 @@ export function calMonth(state, ym, today) {
 }
 
 /* 주간 항목 월간 통계 — 주간 마감일인 금요일이 속한 달에 귀속한다.
-   금요일까지 완료=정상, 토·일 완료=최소, 일요일까지 미완료=미달.
+   금요일까지 완료=정상, 토요일이나 일요일 완료=최소, 일요일까지 미완료=미달.
    완료했거나 일요일이 지난 주만 확정 표본으로 센다. 활성일 없으면 null. */
 function weeklyMonthStats(state, ym, today, item) {
   var start = state[item.startKey];

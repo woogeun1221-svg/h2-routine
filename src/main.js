@@ -1,7 +1,4 @@
-import '@fontsource/ibm-plex-sans-kr/400.css';
-import '@fontsource/ibm-plex-sans-kr/500.css';
-import '@fontsource/ibm-plex-sans-kr/600.css';
-import '@fontsource/ibm-plex-sans-kr/700.css';
+/* 루틴 화면은 시스템 글꼴(iOS SF, Apple SD 산돌고딕 Neo)을 쓴다(2026-11-08 개편). Plex Mono 굵기는 헬스 탭이 쓴다. */
 import '@fontsource/ibm-plex-mono/500.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import '@fontsource/ibm-plex-mono/700.css';
@@ -11,9 +8,10 @@ import {
   HABITS, WEEKLIES, goalsOf, todayStr, getDay, shift, monthList, shiftMonth, weeklyStatus, statusOf,
   isSlot, planFor, defaultPlanOffset
 } from './logic.js';
+import { buildStatePayload, applyServerPlans } from './botsync.js';
 import { load, save as persist, exportText, importText, freshState, mergeStates } from './storage.js';
 import { renderToday, renderSlot } from './views/today.js';
-import { renderPlan } from './views/plan.js';
+import { renderPlan, renderPlanClock, planDayRange } from './views/plan.js';
 import { renderTrends } from './views/trends.js';
 import { renderSettings } from './views/settings.js';
 import { createReminderClient, reminderStatusText, parseConnectCode } from './reminders.js';
@@ -40,6 +38,10 @@ var viewDate = null;           // null = 오늘. 과거 날짜 기록을 수정 
 var activeTab = 'today';       // 'today' | 'plan' | 'trends' | 'iron' | 'settings'
 var trendYm = null;            // 추이 화면에서 보고 있는 달 — 진입 시 이번 달로 리셋
 var planOffset = defaultPlanOffset(todayStr()); // 시간표 0=이번 주, 1=다음 주 — 진입과 자정마다 토일이면 다음 주로
+var PLAN_MODE_KEY = 'h2-routine-plan-mode';     // 시간표 보기(주간, 일간)는 이 기기 편의 설정
+var planMode = readPlanMode();
+var planDay = todayStr();                        // 일간 보기 날짜 — 진입과 자정마다 오늘로
+var lastBotSync = null, botSyncFailed = false, botSyncing = false;
 var resetArmed = false;        // 기록 초기화 2단계 확인 중
 var calendarMode = 'self';
 var archiveFilters = { month: 'all', query: '', limit: 20 };
@@ -77,6 +79,41 @@ function renderPushControls() {
   var disableBtn = document.getElementById('pushDisableBtn');
   if (disableBtn) disableBtn.style.display = status === 'enabled' ? '' : 'none';
 }
+function readPlanMode() {
+  try { return localStorage.getItem(PLAN_MODE_KEY) === 'day' ? 'day' : 'week'; } catch (e) { return 'week'; }
+}
+function pad2(n) { return ('0' + n).slice(-2); }
+/* 설정 화면의 봇 동기화 줄 — 연결 전엔 비워 둔다(빈 줄은 CSS가 숨긴다) */
+function renderBotSync() {
+  var el = document.getElementById('botSyncStatus');
+  if (!el) return;
+  if (!reminders.isConnected()) { el.textContent = ''; return; }
+  if (botSyncFailed) el.textContent = '메인컨트롤 봇 동기화 대기, 기록은 이 기기에 있음';
+  else if (lastBotSync) el.textContent = '메인컨트롤 봇과 동기화됨 ' + pad2(lastBotSync.getHours()) + ':' + pad2(lastBotSync.getMinutes());
+  else el.textContent = '메인컨트롤 봇 동기화 준비 중';
+}
+/* 메인컨트롤 봇 동기화 — 오늘 포지션과 시간표 슬롯을 보내고, 봇에서 바꾼 계획(서버 u가 더 큰 주)을 받아 적용한다.
+   입력 중(메모, 만족도 사유)이면 다시 그리지 않는다. 저장은 바로 하고 화면은 다음 렌더 때 따라온다. */
+function syncBot() {
+  if (!reminders.isConnected() || botSyncing) return Promise.resolve();
+  botSyncing = true;
+  return reminders.syncState(buildStatePayload(state, todayStr())).then(function (res) {
+    lastBotSync = new Date(); botSyncFailed = false;
+    if (res && applyServerPlans(state, res.plans)) {
+      try { persist(state); } catch (e) {}
+      var a = document.activeElement;
+      if (!(a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA'))) render();
+    }
+  }, function () { botSyncFailed = true; }).then(function () {
+    botSyncing = false;
+    renderBotSync();
+  });
+}
+function syncAll() {
+  var done = syncReflection();
+  syncBot();
+  return done;
+}
 function clearBadge() {
   if (navigator.clearAppBadge) navigator.clearAppBadge().catch(function () {});
 }
@@ -88,12 +125,12 @@ function syncReflection() {
 var syncTimer = null;
 function scheduleSync() {
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(function () { syncTimer = null; syncReflection(); }, 1500);
+  syncTimer = setTimeout(function () { syncTimer = null; syncAll(); }, 1500);
 }
 
 /* ---------- save ----------
    v1은 원격 storage라 250ms 디바운스였지만, autoUpdate SW가 임의 시점에 페이지를
-   reload할 수 있는 지금은 디바운스가 데이터 유실 창이 된다. localStorage는 동기·수 KB라
+   reload할 수 있는 지금은 디바운스가 데이터 유실 창이 된다. localStorage는 동기이고 수 KB라
    매 입력마다 즉시 저장. */
 function setSaveState(txt, err) {
   var el = document.getElementById('saveState');
@@ -176,21 +213,47 @@ function ownPlan(monday) {
   }
   return state.plans[monday];
 }
+/* u = 마지막 수정 시각(밀리초). 봇 동기화에서 주 단위로 더 최근 쪽이 이긴다(botsync.js). */
 function setPlanSlot(monday, wd, slot) {
   if (!isSlot(slot) || wd < 1 || wd > 5) return;
-  ownPlan(monday)[wd] = slot;
+  var plan = ownPlan(monday);
+  plan[wd] = slot; plan.u = Date.now();
   save(); render();
 }
 function setPlanMemo(monday, wd, text) {
   if (wd < 1 || wd > 5) return;
   var plan = ownPlan(monday);
   if (text) plan['m' + wd] = text; else delete plan['m' + wd];
+  plan.u = Date.now();
   save(); // 입력 중 재렌더하지 않아 한글 조합과 커서를 보존한다.
 }
 function setPlanOffset(offset) {
   planOffset = offset === 1 ? 1 : 0;
   render();
 }
+function setPlanMode(mode) {
+  planMode = mode === 'day' ? 'day' : 'week';
+  try { localStorage.setItem(PLAN_MODE_KEY, planMode); } catch (e) {}
+  render();
+}
+function setPlanDay(ds) {
+  var range = planDayRange(todayStr());
+  planDay = ds < range.first ? range.first : (ds > range.last ? range.last : ds);
+  render();
+}
+/* 주간 시간표의 날짜를 누르면 그날 일간 보기 */
+function openPlanDay(ds) {
+  planDay = ds;
+  setPlanMode('day');
+  window.scrollTo(0, 0);
+}
+function planHandlers() {
+  return {
+    setMode: setPlanMode, setOffset: setPlanOffset, setDay: setPlanDay, openDay: openPlanDay,
+    setPlanSlot: setPlanSlot, setPlanMemo: setPlanMemo
+  };
+}
+function planView() { return { mode: planMode, offset: planOffset, day: planDay }; }
 function setReflection(day, answer) {
   ensureDay(day).self = answer;
   save(); render();
@@ -236,7 +299,7 @@ function resetGoals() {
 /* ---------- tabs ---------- */
 var SCREENS = { today: 'screen-today', plan: 'screen-plan', trends: 'screen-trends', iron: 'screen-iron', settings: 'screen-settings' };
 
-/* ---------- 헬스 탭 (Iron Terminal, React) — 처음 열 때만 지연 로드·마운트 ----------
+/* ---------- 헬스 탭 (Iron Terminal, React) — 처음 열 때만 지연 로드와 마운트 ----------
    Iron 은 자기 localStorage 키(ironterminal:v1)를 쓰고 루틴 기록과 섞이지 않는다.
    청크는 PWA 서비스워커가 프리캐시하므로 한 번 연 뒤엔 오프라인에서도 열린다. */
 var ironMounted = false;
@@ -255,7 +318,7 @@ function mountIronTab() {
 function switchTab(tab) {
   activeTab = tab;
   if (tab === 'trends') trendYm = todayStr().slice(0, 7); // 진입할 때마다 이번 달부터
-  if (tab === 'plan') planOffset = defaultPlanOffset(todayStr()); // 토일에 열면 다음 주부터
+  if (tab === 'plan') { planOffset = defaultPlanOffset(todayStr()); planDay = todayStr(); } // 토일에 열면 다음 주부터
   resetArmed = false;
   render();
   window.scrollTo(0, 0);
@@ -274,12 +337,14 @@ function rollOverDay() {
   undoStack = emptyUndo(); viewDate = null;
   if (activeTab === 'trends') trendYm = todayStr().slice(0, 7);
   planOffset = defaultPlanOffset(todayStr());
+  planDay = todayStr();
   render();
 }
 /* 시간 경과 안내(10시, 14시, 21시)는 날짜가 그대로여도 바뀌므로 오늘 화면의 슬롯 블록만 다시 그린다.
    입력 칸(만족도 사유, 메모)이 있는 다른 영역은 건드리지 않는다. */
 function refreshSlotGuidance() {
   if (activeTab === 'today') renderSlot(state, todayStr(), todayHandlers(), targetDay());
+  else if (activeTab === 'plan') renderPlanClock(state, todayStr(), planView(), planHandlers());
 }
 
 function render() {
@@ -297,7 +362,7 @@ function render() {
     if (viewDate && viewDate > t) viewDate = null; // 시계가 뒤로 간 경우 방어
     renderToday(state, t, todayHandlers(), targetDay());
   } else if (activeTab === 'plan') {
-    renderPlan(state, t, planOffset, { setOffset: setPlanOffset, setPlanSlot: setPlanSlot, setPlanMemo: setPlanMemo });
+    renderPlan(state, t, planView(), planHandlers());
   } else if (activeTab === 'trends') {
     if (!trendYm) trendYm = t.slice(0, 7);
     renderTrends(state, t, trendYm, {
@@ -315,6 +380,7 @@ function render() {
   }
   renderReminderStatus();
   renderPushControls();
+  renderBotSync();
 }
 function renderResetArm() {
   document.getElementById('resetBtn').hidden = resetArmed;
@@ -352,7 +418,7 @@ document.getElementById('exportBtn').addEventListener('click', function () {
   } else fallback();
 });
 
-/* 파일 내보내기 — iOS에선 공유 시트(파일 앱·에어드랍)가 가장 확실, 그 외엔 다운로드 */
+/* 파일 내보내기 — iOS에선 공유 시트(파일 앱, 에어드랍)가 가장 확실, 그 외엔 다운로드 */
 document.getElementById('exportFileBtn').addEventListener('click', function () {
   downloadTextFile(exportText(state), 'h2-routine-' + todayStr() + '.json', 'application/json');
 });
@@ -396,7 +462,7 @@ function applyImport(text) {
   state = merged.state;
   undoStack = emptyUndo(); viewDate = null;
   save(); render();
-  syncReflection();
+  syncAll();
   alert('가져오기 완료: 새 날짜 ' + merged.added + '일, 덮어쓴 날짜 ' + merged.overwritten + '일. 전체 ' +
     Object.keys(state.days).length + '일치, 시작일 ' + state.startDate);
 }
@@ -431,7 +497,7 @@ document.getElementById('resetConfirmBtn').addEventListener('click', function ()
   undoStack = emptyUndo(); viewDate = null;
   try { persist(state); } catch (e) {}
   render();
-  syncReflection();
+  syncAll();
 });
 
 document.getElementById('reminderConnectForm').addEventListener('submit', async function (event) {
@@ -445,7 +511,7 @@ document.getElementById('reminderConnectForm').addEventListener('submit', async 
     if (!reminders.isConnected() && push.getStatus() === 'off') await push.enable(input.value);
     else await reminders.connect(input.value);
     input.value = '';
-    await syncReflection();
+    await syncAll();
   } catch (error) { alert(error.message); }
   finally { button.disabled = false; renderPushControls(); }
 });
@@ -460,21 +526,21 @@ document.getElementById('pushDisableBtn').addEventListener('click', function () 
 document.addEventListener('visibilitychange', function () {
   if (document.visibilityState !== 'visible') {
     // 앱을 닫기 직전 — 미뤄 둔 루틴 충족 여부를 바로 보낸다(요청은 keepalive)
-    if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; syncReflection(); }
+    if (syncTimer) { clearTimeout(syncTimer); syncTimer = null; syncAll(); }
     return;
   }
   clearBadge();
   if (swRegistration) swRegistration.update().catch(function () {});
   if (renderedDate && renderedDate !== todayStr()) rollOverDay();
   else refreshSlotGuidance();
-  syncReflection();
+  syncAll();
 });
-window.addEventListener('online', syncReflection);
+window.addEventListener('online', syncAll);
 setInterval(function () {
   if (document.visibilityState !== 'visible') return;
   if (renderedDate !== todayStr()) rollOverDay();
   else refreshSlotGuidance();
-  syncReflection();
+  syncAll();
 }, 60000);
 
 /* ---------- init ---------- */
@@ -487,12 +553,12 @@ var hashParams = new URLSearchParams(location.hash.slice(1));
 var connectionCode = hashParams.get('reminder');
 var ironTransfer = hashParams.get('iron-import');
 if (connectionCode || ironTransfer) {
-  // 연결 코드·이사 페이로드는 히스토리·공유 URL에 남기지 않는다.
+  // 연결 코드와 이사 페이로드는 히스토리와 공유 URL에 남기지 않는다.
   history.replaceState(null, '', location.pathname + location.search);
 }
 if (connectionCode) {
-  reminders.connect(connectionCode).then(syncReflection).catch(function (error) { alert(error.message); });
-} else syncReflection();
+  reminders.connect(connectionCode).then(syncAll).catch(function (error) { alert(error.message); });
+} else syncAll();
 clearBadge();
 push.resync().catch(function () {});
 if (ironTransfer) {

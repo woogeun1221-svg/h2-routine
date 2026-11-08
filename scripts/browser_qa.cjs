@@ -72,6 +72,7 @@ async function v2Scenario(browser, origin) {
   const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   const noDot = async selector => assert.equal((await page.locator(selector).innerText()).includes('·'), false, selector + ' 가운뎃점');
   const card = name => page.locator('#cards .card', { hasText: name }).first();
+  const ttCell = (ds, slot) => page.locator(`#planGrid .tt-cell[data-day="${ds}"][data-slot="${slot}"]`);
 
   // A. 일요일 21시: 업데이트 후 처음 연 날 → v2 이행, 시간표는 다음 주(W46)로 열린다 (완료 조건 1)
   await page.clock.setFixedTime(kst('2026-11-08T21:00:00'));
@@ -86,13 +87,18 @@ async function v2Scenario(browser, origin) {
   assert.equal(await page.locator('#cards .card').count(), 7);
   await page.locator('[data-tab="plan"]').click();
   assert.equal(await page.locator('#planWeeks [aria-pressed="true"]').innerText(), '다음 주\nW46 11.9–11.15');
-  assert.equal(await page.locator('#planRows .plan-row').first().getAttribute('data-day'), '2026-11-09');
+  assert.equal(await page.locator('#planGrid .tt-day').first().getAttribute('data-day'), '2026-11-09');
+  assert.equal(await page.locator('#planGrid .tt-cell').count(), 15);
+  assert.equal(await page.locator('#planGrid .tt-we').count(), 2);
   assert((await page.locator('#planInherit').innerText()).includes('전부 아침'));
-  await page.locator('#planRows .plan-row').nth(0).locator('[data-slot="noon"]').click();
-  await page.locator('#planRows .plan-row').nth(1).locator('[data-slot="run"]').click();
-  await page.locator('#planRows .plan-row').nth(0).locator('input').fill('송은 회식');
+  await ttCell('2026-11-09', 'noon').click();
+  await ttCell('2026-11-10', 'run').click();
+  await page.locator('#planMemos input[data-day="2026-11-09"]').fill('송은 회식');
   saved = await stored();
-  assert.deepEqual(saved.plans['2026-11-09'], { 1: 'noon', 2: 'run', 3: 'am', 4: 'am', 5: 'am', m1: '송은 회식' });
+  const { u: planStamp, ...plan46 } = saved.plans['2026-11-09'];
+  assert.deepEqual(plan46, { 1: 'noon', 2: 'run', 3: 'am', 4: 'am', 5: 'am', m1: '송은 회식' });
+  assert.equal(typeof planStamp, 'number');                        // 봇 동기화의 주 단위 마지막 수정 시각
+  assert.equal(await ttCell('2026-11-09', 'noon').locator('.tt-block').getAttribute('class'), 'tt-block plan');
   assert.equal(await page.locator('#planCount').innerText(), '아침 3, 점심 1, 저녁런닝 1');
   assert.equal(await page.locator('#planInherit').isVisible(), false);
   await noDot('#screen-plan');
@@ -101,6 +107,25 @@ async function v2Scenario(browser, origin) {
     await page.screenshot({ path: path.join(report, 'v2-plan-sunday-' + width + '.png'), fullPage: true });
   }
   await page.setViewportSize({ width: 390, height: 844 });
+  // 일간 보기: 일요일 21시는 송은 시간과 지금 선, 다음 날(월)은 점심 계획과 메모
+  await page.locator('#planModes [data-mode="day"]').click();
+  assert.equal(await page.locator('#planWeekView').isVisible(), false);
+  assert.equal(await page.locator('#planTimeline .tl-we').innerText(), '송은 시간');
+  assert.equal(await page.locator('#planTimeline .tl-now').innerText(), '21:00');
+  await page.locator('#planDayHead [data-nav="1"]').click();
+  assert.equal(await page.locator('#planTimeline .tl-block[data-slot="noon"]').getAttribute('class'), 'tl-block plan');
+  assert.equal(await page.locator('#planDayMemo input').inputValue(), '송은 회식');
+  await page.locator('#planTimeline .tl-block[data-slot="am"]').click();   // 일간에서도 계획을 옮길 수 있다
+  assert.equal((await stored()).plans['2026-11-09'][1], 'am');
+  await page.locator('#planTimeline .tl-block[data-slot="noon"]').click();
+  assert.equal((await stored()).plans['2026-11-09'][1], 'noon');
+  await noDot('#screen-plan');
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 }); await noOverflow();
+    await page.screenshot({ path: path.join(report, 'v2-plan-day-' + width + '.png'), fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#planModes [data-mode="week"]').click();
   await page.locator('#planWeeks [data-offset="0"]').click();
   assert.equal(await page.locator('#planWeeks [aria-pressed="true"]').innerText(), '이번 주\nW45 11.2–11.8');
 
@@ -137,7 +162,8 @@ async function v2Scenario(browser, origin) {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('[data-tab="plan"]').click();
   assert.equal(await page.locator('#planWeeks [aria-pressed="true"]').innerText(), '이번 주\nW46 11.9–11.15');
-  assert.equal(await page.locator('#planRows .plan-row').nth(0).locator('.plan-note').innerText(), '실제 저녁런닝');
+  assert.equal(await ttCell('2026-11-09', 'run').locator('.tt-block').getAttribute('class'), 'tt-block done');
+  assert.equal(await ttCell('2026-11-09', 'noon').locator('.tt-block').getAttribute('class'), 'tt-block ghost');
   await page.locator('[data-tab="today"]').click();
 
   // 자정 경계: 시간 경과 안내는 1분 갱신으로 바뀐다(다시 그리기 없이 21시 → 마감 안내)
@@ -159,9 +185,9 @@ async function v2Scenario(browser, origin) {
   await page.locator('[data-tab="plan"]').click();
   assert.equal(await page.locator('#planWeeks [aria-pressed="true"]').innerText(), '다음 주\nW47 11.16–11.22');
   assert((await page.locator('#planInherit').innerText()).includes('직전 계획을 물려받았다'));
-  assert.deepEqual(await page.locator('#planRows .plan-row [aria-pressed="true"]').evaluateAll(els => els.map(e => e.dataset.slot)),
+  assert.deepEqual(await page.locator('#planGrid .tt-cell[aria-pressed="true"]').evaluateAll(els => els.map(e => e.dataset.slot)),
     ['noon', 'run', 'am', 'am', 'am']);
-  assert.equal(await page.locator('#planRows .plan-row').nth(0).locator('input').inputValue(), ''); // 메모는 물려받지 않는다
+  assert.equal(await page.locator('#planMemos input[data-day="2026-11-16"]').inputValue(), ''); // 메모는 물려받지 않는다
 
   // D. v1 JSON 가져오기(합치기) → 월별 장부에 그 달이 나타난다 (완료 조건 4). 장부 7열, 캘린더 월요일 시작
   await page.locator('[data-tab="settings"]').click();
@@ -218,13 +244,65 @@ async function v2Scenario(browser, origin) {
     yesterdayMissBanner: true, v1ImportInLedger: true, isoWeek46: true, resetTwoStep: true };
 }
 
+/* 메인컨트롤 봇 동기화 — 연결된 기기는 /state 로 요약과 슬롯 계획만 보내고(메모, 사유 없음),
+   봇에서 바꾼 계획(서버 u가 더 큼)을 받아 시간표와 오늘 슬롯에 바로 반영한다. 메모는 이 기기 것을 지킨다. */
+async function botSyncScenario(browser, origin) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, timezoneId: 'America/New_York', serviceWorkers: 'block' });
+  const page = await context.newPage();
+  const errors = [], bodies = [];
+  page.on('pageerror', error => errors.push(error.message));
+  const seedState = { ...v2Seed, v: 2, exerciseSlotStart: '2026-11-08',
+    plans: { '2026-11-09': { 1: 'am', 2: 'am', 3: 'am', 4: 'am', 5: 'am', m1: '송은 생일', u: 1000 } },
+    days: { ...v2Seed.days, '2026-11-09': { p: 30, t: 5, r: 5, c: 'o', self: 'x', selfReason: '봇에 가면 안 되는 사유' } } };
+  await page.addInitScript(data => {
+    if (!localStorage.getItem('h2-routine-v1')) localStorage.setItem('h2-routine-v1', JSON.stringify(data));
+    localStorage.setItem('h2-routine-reminder-auth', 'qa-device-token');
+  }, seedState);
+  await page.route(api + '/**', async route => {
+    const url = route.request().url();
+    if (route.request().method() === 'GET') { await route.fulfill({ json: { key: vapidKey } }); return; }
+    if (url.endsWith('/state')) {
+      bodies.push(route.request().postDataJSON());
+      await route.fulfill({ json: { ok: true, plans: { '2026-11-09': { 1: 'noon', 2: 'run', 3: 'am', 4: 'am', 5: 'am', u: 5000 } } } });
+      return;
+    }
+    await route.fulfill({ json: { ok: true } });
+  });
+  await page.clock.setFixedTime(kst('2026-11-09T11:00:00'));
+  await page.goto(origin + '/h2-routine/', { waitUntil: 'networkidle' });
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('h2-routine-v1')).plans['2026-11-09'].u === 5000);
+  const body = bodies[0];
+  assert.equal(body.today, '2026-11-09');
+  assert.equal(body.slotStart, '2026-11-08');
+  assert.deepEqual(Object.keys(body.days).sort(), ['2026-11-08', '2026-11-09']);
+  assert.deepEqual(body.days['2026-11-09'], { status: 'min', planned: 'am', actual: null, slotRequired: true,
+    full: ['운동 슬롯', '푸쉬업 70', '턱걸이 15', '독서 15분'], min: [], wifeX: false });
+  assert.deepEqual(body.plans['2026-11-09'], { 1: 'am', 2: 'am', 3: 'am', 4: 'am', 5: 'am', u: 1000 });
+  const raw = JSON.stringify(bodies);
+  for (const secret of ['송은 생일', '봇에 가면 안 되는 사유', 'selfReason', '"self"']) assert(!raw.includes(secret), secret);
+  const saved = JSON.parse(await page.evaluate(() => localStorage.getItem('h2-routine-v1')));
+  assert.deepEqual(saved.plans['2026-11-09'], { 1: 'noon', 2: 'run', 3: 'am', 4: 'am', 5: 'am', m1: '송은 생일', u: 5000 });
+  await page.reload({ waitUntil: 'networkidle' });
+  assert.equal(await page.locator('#slotBlock .slot-plan').innerText(), '계획 점심');
+  await page.locator('[data-tab="plan"]').click();
+  assert.equal(await page.locator('#planGrid .tt-cell[data-day="2026-11-10"][data-slot="run"]').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.locator('#planMemos input[data-day="2026-11-09"]').inputValue(), '송은 생일');
+  await page.locator('[data-tab="settings"]').click();
+  await page.waitForFunction(() => document.getElementById('botSyncStatus').textContent.startsWith('메인컨트롤 봇과 동기화됨'));
+  await page.screenshot({ path: path.join(report, 'botsync-settings-390.png'), fullPage: true });
+  assert.deepEqual(errors, []);
+  await context.close();
+  return { botSyncPayloadPrivate: true, botPlanApplied: true, memoKept: true };
+}
+
 (async () => {
   fs.mkdirSync(report, { recursive: true });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
   try {
     if (process.argv.includes('--v2-only')) {
-      console.log(JSON.stringify(await v2Scenario(browser, 'http://127.0.0.1:' + server.address().port)));
+      const origin = 'http://127.0.0.1:' + server.address().port;
+      console.log(JSON.stringify({ ...(await v2Scenario(browser, origin)), ...(await botSyncScenario(browser, origin)) }));
       return;
     }
     const context = await browser.newContext({ viewport: { width: 390, height: 844 },
@@ -249,7 +327,8 @@ async function v2Scenario(browser, origin) {
       assert.equal(await page.locator('#slotBlock [data-slot]').count(), 3);
       assert.equal(await page.locator('#weekNo').textContent(), 'W' + isoWeekOf(date));
       await page.locator('[data-tab="plan"]').click();
-      assert.equal(await page.locator('#planRows .plan-row').count(), 7);
+      assert.equal(await page.locator('#planGrid .tt-day').count(), 7);
+      assert.equal(await page.locator('#planGrid .tt-cell').count(), 15);
       assert((await page.locator('#planWeeks [aria-pressed="true"]').innerText()).startsWith(isWeekendDs(date) ? '다음 주' : '이번 주'));
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       await page.screenshot({ path: path.join(report, 'production-plan-390.png'), fullPage: true });
@@ -321,6 +400,12 @@ async function v2Scenario(browser, origin) {
         assert.equal(body.subscription.endpoint, 'https://web.push.apple.com/qa-endpoint');
         sent.push({ subscribe: true });
         await route.fulfill({ json: { ok: true } });
+      } else if (url.endsWith('/state')) {
+        assert.deepEqual(Object.keys(body).sort(), ['days', 'plans', 'slotStart', 'today']);
+        const text = JSON.stringify(body);
+        assert(!text.includes('selfReason') && !text.includes('미뤘다'), '봇 동기화에 사유가 들어가면 안 된다');
+        sent.push({ state: body });
+        await route.fulfill({ json: { ok: true, plans: {} } });
       } else {
         assert(url.endsWith('/answer'));
         assert.deepEqual(Object.keys(body).sort(), ['answered', 'day', 'routine']);
@@ -371,7 +456,7 @@ async function v2Scenario(browser, origin) {
     const archiveText = fs.readFileSync(await archiveDownload.path(), 'utf8');
     assert(archiveText.includes(oldRecord.selfReason));
     assert(archiveText.includes(reason.split('\n')[0]));
-    assert(archiveText.includes('현재 O · 보관된 X 사유'));
+    assert(archiveText.includes('현재 O, 보관된 X 사유'));
     await page.locator('#archiveMonth').selectOption('all');
     await page.locator('#calNext').click();
     await page.locator('[data-calendar-mode="routine"]').click();
@@ -391,6 +476,8 @@ async function v2Scenario(browser, origin) {
     assert.equal(await page.evaluate(() => window.__qaPush.permissionRequests), 1);
     assert.equal(await page.evaluate(() => localStorage.getItem('h2-routine-push-endpoint')), 'https://web.push.apple.com/qa-endpoint');
     assert(sent.some(entry => entry.pair));
+    await page.waitForFunction(() => document.getElementById('botSyncStatus').textContent.includes('동기화됨'));
+    assert(sent.some(entry => entry.state && entry.state.today === date));
     assert.deepEqual(sent.filter(entry => entry.day).at(-1), { day: date, answered: true, routine: sent.filter(entry => entry.day).at(-1).routine });
     assert.equal(await page.locator('#reminderConnectBtn').textContent(), '이 기기 연결');
     assert.equal(await page.locator('#pushDisableBtn').isVisible(), true);
@@ -439,7 +526,8 @@ async function v2Scenario(browser, origin) {
     assert.equal(await firstCard.locator('.set-row').count(), 4);
     await page.locator('#screen-iron .iron-subnav-item').first().click();
     assert.equal(await page.locator('.tabbar .tab').first().evaluate(el => getComputedStyle(el).fontFamily), routineTabFont);
-    assert.equal(await page.evaluate(() => getComputedStyle(document.body).fontFamily.includes('IBM Plex Sans KR')), true);
+    // 루틴 화면은 시스템 글꼴(2026-11-08 개편). Iron CSS가 body 글꼴을 바꾸지 않았는지 본다.
+    assert.equal(await page.evaluate(() => getComputedStyle(document.body).fontFamily.includes('Apple SD Gothic Neo')), true);
     for (const width of [390, 320, 1200]) {
       await page.setViewportSize({ width, height: 844 });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
@@ -538,9 +626,11 @@ async function v2Scenario(browser, origin) {
     }
     assert.deepEqual(errors, []);
     const v2 = await v2Scenario(browser, 'http://127.0.0.1:' + server.address().port);
+    const botSync = await botSyncScenario(browser, 'http://127.0.0.1:' + server.address().port);
     console.log(JSON.stringify({ passed: true, widths: [390, 320, 1200], browserErrors: errors.length,
       legacyRecordsPreserved: true, reasonReloaded: true, crossMonthArchiveAndDownloads: true, ironTabMounted: true,
-      pastDayEdit: true, squatRetired: true, rrSnapshotWeekly: true, pushSubscribeFlow: true, apiMocked: true, ...v2, screenshots: report }));
+      pastDayEdit: true, squatRetired: true, rrSnapshotWeekly: true, pushSubscribeFlow: true, apiMocked: true, ...v2, ...botSync,
+      screenshots: report }));
   } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));

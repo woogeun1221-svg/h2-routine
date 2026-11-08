@@ -167,3 +167,38 @@ describe('오늘 — 배너와 주차 (완료 조건 3, 5)', () => {
     expect(labels[11].className).not.toContain('we'); // 11-06 금
   });
 });
+
+describe('오늘 — 하루 막대(06~24시)', () => {
+  beforeEach(mountSkeleton);
+  const seg = name => slot().querySelector('.daybar-seg.' + name);
+
+  it('평일 15:30: 계획 칸, 지난 창, 지금 창, 지금 선 위치, 버튼만 data-slot', () => {
+    const s = st({}, { plans: { [MON]: { 1: 'run', 2: 'am', 3: 'am', 4: 'am', 5: 'am' } } });
+    renderSlot(s, MON, handlers({ hour: 15, minute: 30 }), MON);
+    expect(slot().querySelector('.daybar-track').className).toBe('daybar-track');
+    expect(seg('am').className).toBe('daybar-seg am past');
+    expect(seg('noon').className).toBe('daybar-seg noon past');
+    expect(seg('run').className).toBe('daybar-seg run planned');
+    expect(seg('noon').style.left).toBe('33.333%');
+    expect(seg('noon').style.width).toBe('11.111%');
+    expect(slot().querySelector('.daybar-now').style.left).toBe('52.778%');
+    expect(slot().querySelector('.daybar-bed').style.left).toBe('94.444%');
+    expect([...slot().querySelectorAll('.daybar-axis span')].map(x => x.textContent)).toEqual(['06', '12', '18', '취침']);
+    expect(slot().querySelectorAll('[data-slot]').length).toBe(3);
+    expect([...slot().querySelectorAll('.slot-time')].map(x => x.textContent)).toEqual(['~10시', '~14시', '~21시']);
+
+    renderSlot(s, MON, handlers({ hour: 19, minute: 0 }), MON);
+    expect(seg('run').className).toBe('daybar-seg run planned live');
+    renderSlot({ ...s, days: { [MON]: { e: 'run' } } }, MON, handlers({ hour: 19 }), MON);
+    expect(seg('run').className).toBe('daybar-seg run planned done live');
+  });
+
+  it('지난 날은 지금 선 없이 모든 창이 지난 것, 주말은 송은 시간 막대', () => {
+    renderSlot(st(), TUE, handlers({ hour: 9 }), MON);
+    expect(slot().querySelector('.daybar-now')).toBe(null);
+    expect(seg('run').className).toContain('past');
+    renderSlot(st({ [SAT]: { e: 'noon' } }), SAT, handlers({ hour: 12 }), SAT);
+    expect(slot().querySelector('.daybar-track').className).toBe('daybar-track we');
+    expect(seg('noon').className).toContain('done');
+  });
+});

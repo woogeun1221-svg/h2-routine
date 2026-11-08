@@ -99,7 +99,7 @@ export function renderReflectionHistory(state, month, today) {
   root.appendChild(chips);
   const note = document.createElement('p');
   note.className = 'table-note';
-  note.textContent = 'O 비율 = O / (O + X) · 오늘 포함 · 미응답은 제외';
+  note.textContent = 'O 비율 = O / (O + X), 오늘 포함, 미응답은 제외';
   root.appendChild(note);
   const jump = document.createElement('button');
   jump.className = 'reset archive-jump'; jump.textContent = 'X 사유 전체 보기 ↓';
@@ -163,7 +163,7 @@ export function renderReflectionArchive(state, today, filters = { month: 'all', 
     const query = filters.query.trim().toLocaleLowerCase();
     const matched = entries.filter(entry => (filters.month === 'all' || entry.day.startsWith(filters.month)) &&
       (!query || (entry.day + ' ' + entry.day.replaceAll('-', '.') + ' ' + entry.reason).toLocaleLowerCase().includes(query)));
-    count.textContent = '전체 ' + entries.length + '건 · 표시 ' + Math.min(matched.length, filters.limit) + ' / ' + matched.length + '건';
+    count.textContent = '전체 ' + entries.length + '건, 표시 ' + Math.min(matched.length, filters.limit) + ' / ' + matched.length + '건';
     if (!matched.length) {
       const empty = document.createElement('p'); empty.className = 'settings-note';
       empty.textContent = entries.length ? '검색 조건에 맞는 사유가 없습니다.' : 'X를 선택하고 남긴 사유가 이곳에 쌓입니다.';
@@ -174,7 +174,7 @@ export function renderReflectionArchive(state, today, filters = { month: 'all', 
       const date = document.createElement('time'); date.dateTime = entry.day;
       date.textContent = entry.day.replaceAll('-', '.');
       const badge = document.createElement('span'); badge.className = entry.answer === 'x' ? 'self-x' : 'archive-retained';
-      badge.textContent = entry.answer === 'x' ? 'X' : '현재 ' + (entry.answer?.toUpperCase() || '미응답') + ' · 보관된 사유';
+      badge.textContent = entry.answer === 'x' ? 'X' : '현재 ' + (entry.answer?.toUpperCase() || '미응답') + ', 보관된 사유';
       const head = document.createElement('div'); head.className = 'archive-entry-head'; head.append(date, badge);
       const reason = document.createElement('p');
       reason.textContent = entry.reason.trim() ? entry.reason : '사유를 아직 적지 않았습니다.';
@@ -195,7 +195,7 @@ export function showReflectionDay(state, day) {
   const entry = getDay(state, day);
   root.replaceChildren(); root.hidden = false;
   const title = document.createElement('b');
-  title.textContent = day.replaceAll('-', '.') + ' · ' + (entry.self?.toUpperCase() || '미응답');
+  title.textContent = day.replaceAll('-', '.') + ', ' + (entry.self?.toUpperCase() || '미응답');
   root.appendChild(title);
   if (entry.selfReason || entry.self === 'x') {
     const reason = document.createElement('p');

@@ -86,7 +86,8 @@ export function validateState(obj) {
   return null;
 }
 
-/* plans: { 'YYYY-MM-DD'(월요일): { 1..5?: 'am'|'noon'|'run', m1..m5?: 문자열 } } — 모르는 키는 무시 */
+/* plans: { 'YYYY-MM-DD'(월요일): { 1..5?: 'am'|'noon'|'run', m1..m5?: 문자열, u?: 마지막 수정 밀리초 } } — 모르는 키는 무시.
+   u는 메인컨트롤 봇 동기화에서 주 단위로 더 최근 쪽을 고르는 데 쓴다(2026-11-08). */
 function validatePlans(plans) {
   if (!plans || typeof plans !== 'object' || Array.isArray(plans)) return 'plans 형식 오류';
   var keys = Object.keys(plans);
@@ -100,6 +101,7 @@ function validatePlans(plans) {
       if (s !== undefined && s !== null && !isSlot(s)) return 'plans.' + k + '.' + wd + ' 값 오류';
       if (m !== undefined && (typeof m !== 'string' || m.length > MEMO_MAX)) return 'plans.' + k + '.m' + wd + ' 값 오류';
     }
+    if (p.u !== undefined && (typeof p.u !== 'number' || !isFinite(p.u) || p.u < 0)) return 'plans.' + k + '.u 값 오류';
   }
   return null;
 }

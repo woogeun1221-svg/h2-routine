@@ -27,11 +27,11 @@ export function reflectionArchive(state, today) {
 
 export function reflectionArchiveText(state, today) {
   const entries = reflectionArchive(state, today);
-  const lines = ['# 하루 만족도 · X 사유 아카이브', '', '내보낸 날짜: ' + today,
-    '전체 ' + entries.length + '건 · 최근 날짜부터', ''];
+  const lines = ['# 하루 만족도, X 사유 아카이브', '', '내보낸 날짜: ' + today,
+    '전체 ' + entries.length + '건, 최근 날짜부터', ''];
   for (const entry of entries) {
-    const status = entry.answer === 'x' ? 'X' : '현재 ' + (entry.answer?.toUpperCase() || '미응답') + ' · 보관된 X 사유';
-    lines.push('## ' + entry.day + ' · ' + status, '',
+    const status = entry.answer === 'x' ? 'X' : '현재 ' + (entry.answer?.toUpperCase() || '미응답') + ', 보관된 X 사유';
+    lines.push('## ' + entry.day + ', ' + status, '',
       (entry.reason.trim() ? entry.reason : '사유를 아직 적지 않았습니다.').split('\n').map(line => '> ' + line).join('\n'), '');
   }
   return lines.join('\n');

@@ -4,9 +4,10 @@
    day를 주면 그날(과거) 기록을 보여 주고 카드 입력이 그날에 쓰인다 — 연속 생존, 이달 정상, 어제 미달 배너는
    항상 오늘(t) 기준이다. 카드 목록은 goalsOf(state, day)라 그날 활성이던 습관(은퇴 전 스쿼트 등)이 그대로 나온다. */
 import {
-  WIFE, WEEKLIES, SLOTS, SLOT_ORDER, EXERCISE_SLOT, goalsOf, checksOf, shift, daysBetween, weekday,
+  WIFE, WEEKLIES, SLOTS, SLOT_ORDER, SLOT_WINDOW, SLOT_CUTOFF, DAY_START, DAY_END, BEDTIME, EXERCISE_SLOT,
+  goalsOf, checksOf, shift, daysBetween, weekday,
   getDay, statusOf, completion, streak, monthFullRate, weeklyStatus, isoWeek, isWeekend, isSlot,
-  plannedSlot, slotGuidance, gapsOf, dayRecorded, seoulHour
+  plannedSlot, slotGuidance, gapsOf, dayRecorded, seoulHour, seoulMinute
 } from '../logic.js';
 import { renderReflection } from './reflection.js';
 
@@ -26,7 +27,7 @@ export function renderToday(state, t, h, day) {
   var notice = document.getElementById('editNotice');
   notice.className = 'edit-notice' + (isToday ? '' : ' show');
   document.getElementById('editNoticeText').textContent = isToday ? '' :
-    p[1] + '.' + p[2] + ' ' + weekday(day) + '요일 기록을 수정하는 중 — 입력 즉시 저장';
+    p[1] + '.' + p[2] + ' ' + weekday(day) + '요일 기록을 수정하는 중, 입력 즉시 저장';
 
   document.getElementById('streak').textContent = streak(state, t) + '일';
   var fr = monthFullRate(state, t);
@@ -81,9 +82,12 @@ export function renderSlot(state, t, h, day) {
     var flag = document.createElement('span'); flag.className = 'done-flag full'; flag.textContent = '완료';
     nm.appendChild(flag);
   }
-  var plan = document.createElement('span'); plan.className = 'slot-plan mono';
+  var plan = document.createElement('span'); plan.className = 'slot-plan';
   plan.textContent = weekend ? '시간표 없음' : '계획 ' + SLOTS[planned];
   top.append(nm, plan);
+
+  var minute = (h && typeof h.minute === 'number') ? h.minute : ((h && typeof h.hour === 'number') ? 0 : seoulMinute());
+  var bar = dayBar(planned, actual, weekend, isToday ? hour + minute / 60 : null, isToday ? hour : (day < t ? 24 : -1));
 
   var seg = document.createElement('div'); seg.className = 'btns seg slot-seg';
   SLOT_ORDER.forEach(function (s) {
@@ -92,8 +96,9 @@ export function renderSlot(state, t, h, day) {
     b.dataset.slot = s;
     b.setAttribute('aria-pressed', String(actual === s));
     b.setAttribute('aria-label', SLOTS[s] + (planned === s ? ', 계획 슬롯' : '') + (actual === s ? ', 완료' : ''));
-    var label = document.createElement('span'); label.textContent = SLOTS[s];
-    b.appendChild(label);
+    var label = document.createElement('span'); label.className = 'slot-name'; label.textContent = SLOTS[s];
+    var time = document.createElement('small'); time.className = 'slot-time'; time.textContent = '~' + SLOT_CUTOFF[s] + '시';
+    b.append(label, time);
     if (planned === s) {
       var tag = document.createElement('small'); tag.className = 'slot-tag'; tag.textContent = '계획';
       b.appendChild(tag);
@@ -104,7 +109,43 @@ export function renderSlot(state, t, h, day) {
 
   var note = document.createElement('p'); note.className = 'slot-note';
   note.textContent = guide.text;
-  root.append(top, seg, note);
+  root.append(top, bar, seg, note);
+}
+
+/* 하루 막대 — 06~24시 위에 슬롯 창 세 개, 23시 취침, 오늘이면 지금 위치. 보기 전용(기록은 아래 버튼).
+   nowAt: 지금 시각(시, 소수) 또는 null. passedHour: 이 시각까지 끝난 창은 지난 것으로 흐리게(과거 날은 24). */
+function dayBar(planned, actual, weekend, nowAt, passedHour) {
+  var span = DAY_END - DAY_START;
+  function pct(x) { return ((x - DAY_START) / span * 100).toFixed(3) + '%'; }
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  var wrap = document.createElement('div'); wrap.className = 'daybar';
+  wrap.setAttribute('aria-hidden', 'true');
+  var track = document.createElement('div'); track.className = 'daybar-track' + (weekend ? ' we' : '');
+  SLOT_ORDER.forEach(function (s) {
+    var win = SLOT_WINDOW[s];
+    var seg = document.createElement('i');
+    /* data-slot은 기록 버튼만 쓴다(블록 안 [data-slot] 선택자가 버튼 셋만 잡도록) */
+    seg.className = 'daybar-seg ' + s + (planned === s ? ' planned' : '') + (actual === s ? ' done' : '') +
+      (passedHour >= win[1] ? ' past' : '') + (nowAt !== null && nowAt >= win[0] && nowAt < win[1] ? ' live' : '');
+    seg.style.left = pct(win[0]);
+    seg.style.width = ((win[1] - win[0]) / span * 100).toFixed(3) + '%';
+    track.appendChild(seg);
+  });
+  var bed = document.createElement('i'); bed.className = 'daybar-bed'; bed.style.left = pct(BEDTIME);
+  track.appendChild(bed);
+  if (nowAt !== null && nowAt >= DAY_START) {
+    var now = document.createElement('i'); now.className = 'daybar-now'; now.style.left = pct(Math.min(nowAt, DAY_END));
+    track.appendChild(now);
+  }
+  var axis = document.createElement('div'); axis.className = 'daybar-axis';
+  [6, 12, 18].forEach(function (hr) {
+    var lb = document.createElement('span'); lb.textContent = pad(hr); lb.style.left = pct(hr);
+    axis.appendChild(lb);
+  });
+  var bedLb = document.createElement('span'); bedLb.className = 'bed'; bedLb.textContent = '취침'; bedLb.style.left = pct(BEDTIME);
+  axis.appendChild(bedLb);
+  wrap.append(track, axis);
+  return wrap;
 }
 
 /* 현재 포지션 줄 — 정상/최소/미달 pill과 다음 단계까지 남은 것. 미달이면 최소까지를 먼저 보여 준다. */
@@ -150,7 +191,7 @@ function renderCards(state, t, h) {
     nm.innerHTML = hb.name + '<span class="card-sub">최소 ' + hb.min + hb.unit + '</span>' +
       (tier === 'full' ? '<span class="done-flag full">정상</span>' :
        tier === 'min'  ? '<span class="done-flag min">최소</span>' : '');
-    var valBtn = document.createElement('button'); valBtn.className = 'card-val mono';
+    var valBtn = document.createElement('button'); valBtn.className = 'card-val num';
     valBtn.innerHTML = v + '<span class="of"> / ' + hb.target + hb.unit + '</span>';
     valBtn.title = '탭해서 직접 입력';
     valBtn.addEventListener('click', function () {
@@ -263,15 +304,15 @@ function renderWeeklyCard(state, t, h, wrap, item) {
   var status = document.createElement('div'); status.className = 'weekly-status';
   if (review.done) {
     status.textContent = review.reviewedOn.slice(5).replace('-', '.') + ' ' + weekday(review.reviewedOn) +
-      '요일 완료' + (review.reviewedOn > review.friday ? ' · 마감 후' : '');
+      '요일 완료' + (review.reviewedOn > review.friday ? ', 마감 후' : '');
   } else if (review.phase === 'upcoming') {
     status.textContent = item.upcoming;
   } else if (review.phase === 'open') {
     status.textContent = item.open;
   } else if (review.phase === 'deadline') {
-    status.textContent = '권장 마감일 — 아직 미완료';
+    status.textContent = '권장 마감일, 아직 미완료';
   } else if (review.phase === 'missed') {
-    status.textContent = '권장일 지남 — 늦게라도 완료 가능';
+    status.textContent = '권장일 지남, 늦게라도 완료 가능';
   } else {
     status.textContent = '업데이트 이후 주간 기록 시작';
   }

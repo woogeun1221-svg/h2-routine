@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.woogeun.routine.weekly</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/ourteam/projects/Routine_Tracker/scripts/reminder_service.py</string>
+    <string>weekly</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/ourteam/projects/Routine_Tracker</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PYTHONDONTWRITEBYTECODE</key><string>1</string>
+    <key>TZ</key><string>Asia/Seoul</string>
+  </dict>
+  <!-- 일요일(Weekday 0) 20:00 한국 시간 — 다음 주 시간표를 메인컨트롤 봇 DM 으로 -->
+  <key>StartCalendarInterval</key><array>
+    <dict><key>Weekday</key><integer>0</integer><key>Hour</key><integer>20</integer><key>Minute</key><integer>0</integer></dict>
+  </array>
+  <key>StandardOutPath</key><string>/Users/ourteam/projects/Routine_Tracker/logs/weekly.log</string>
+  <key>StandardErrorPath</key><string>/Users/ourteam/projects/Routine_Tracker/logs/weekly.err.log</string>
+</dict></plist>
