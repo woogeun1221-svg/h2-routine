@@ -5,7 +5,8 @@ import {
 } from '../logic.js';
 import { renderReflectionHistory, renderReflectionArchive, showReflectionDay } from './reflection.js';
 
-var WD = ['일', '월', '화', '수', '목', '금', '토'];
+/* v2부터 월요일 시작(calMonth.lead와 같은 순서). 토일은 황동 라벨. */
+var WD = ['월', '화', '수', '목', '금', '토', '일'];
 
 export function renderTrends(state, t, ym, options = {}) {
   const mode = options.mode || 'self';
@@ -44,8 +45,10 @@ function renderCalendar(state, t, ym, mode) {
 
   var wd = document.getElementById('calWd');
   wd.innerHTML = '';
-  WD.forEach(function (w) {
-    var s = document.createElement('span'); s.textContent = w; wd.appendChild(s);
+  WD.forEach(function (w, i) {
+    var s = document.createElement('span'); s.textContent = w;
+    if (i >= 5) s.className = 'we';
+    wd.appendChild(s);
   });
 
   var cal = calMonth(state, ym, t);
@@ -119,7 +122,9 @@ function renderMonthly(state, t) {
     var tr = document.createElement('tr');
     tr.innerHTML = '<td>' + r.label + '</td><td class="c-full">' + r.full + '</td>' +
       '<td class="c-min">' + r.min + '</td><td class="c-miss">' + r.miss + '</td>' +
-      '<td class="c-rate">' + r.rate + '%</td>';
+      '<td class="c-rate">' + r.rate + '%</td>' +
+      '<td class="c-slot">' + (r.slotDays ? r.slotDone + '/' + r.slotDays : '—') + '</td>' +
+      '<td class="c-wx">' + r.wifeX + '</td>';
     tb.appendChild(tr);
   });
 }

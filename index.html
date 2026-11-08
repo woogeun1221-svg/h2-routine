@@ -24,7 +24,7 @@
     <!-- ================= 오늘 ================= -->
     <div id="screen-today">
       <div class="date-row">
-        <h1 class="date"><span id="dateStr"></span><span class="dplus" id="dplus"></span></h1>
+        <h1 class="date"><span id="dateStr"></span><span class="dplus wkno" id="weekNo"></span><span class="dplus" id="dplus"></span></h1>
         <div class="day-nav" role="group" aria-label="기록 날짜 이동">
           <button class="btn nav-btn" id="dayPrev" aria-label="전날 기록">◀&#xFE0E;</button>
           <button class="btn nav-btn" id="dayNext" aria-label="다음날 기록">▶&#xFE0E;</button>
@@ -43,8 +43,12 @@
       </div>
 
       <div class="banner" id="banner">
-        <b>어제 미달.</b> 오늘은 거를 수 없는 날 — 최소 포지션(<span id="bannerMins">30·5·5</span>, 가슴 펴기와 송은 룰 포함)은 무조건 채운다.
+        <b id="bannerHead">어제 미달.</b> 오늘은 거를 수 없는 날 — 최소 포지션(<span id="bannerMins">30, 5, 5</span>, 가슴 펴기와 송은 룰 포함)은 무조건 채운다.
       </div>
+
+      <!-- v2 운동 슬롯: 평일 정상 조건. 카드 목록(#cards) 밖에 둬서 카드 수 단언과 섞이지 않는다 -->
+      <section id="slotBlock" class="card slot-card" aria-label="운동 슬롯" hidden></section>
+      <div id="posLine" class="posline" role="status"></div>
 
       <div class="cards" id="cards"></div>
 
@@ -61,13 +65,29 @@
       </div>
 
       <div class="rule-note">
-        <b>정상 포지션</b> <span id="goalFullNums">100 · 20 · 20</span> &nbsp;/&nbsp; <b>최소 포지션</b> <span id="goalMinNums">30 · 5 · 5</span><br>
+        <b>정상 포지션</b> <span id="goalFullNums">100, 20, 20</span> &nbsp;/&nbsp; <b>최소 포지션</b> <span id="goalMinNums">30, 5, 5</span><br>
+        <b>운동 슬롯 룰</b> 평일은 시간표의 슬롯 하나(아침, 점심, 저녁런닝)를 해야 정상이다. 비우면 그날은 최소 포지션까지만. 주말은 송은 시간이라 슬롯 조건이 없다.<br>
         <b>송은 룰</b> 짜증이 올라오면 — 해결 먼저, 감정은 나중. X는 그 자체로 그날 미달이다.<br>
         <b>가슴 펴기 룰</b> 하루 내내 가슴을 당당히 펴고 있는가. 저녁에 O를 눌러야 그날 통과이고, X나 미응답은 그날 미달이다.<br>
         <b>투자 원칙 룰</b> 매주 한 번 정독·검토. 언제든 체크할 수 있고 목·금을 권장한다. 금요일까지 미완료면 그날 미달이다.<br>
         <b>손익비 스냅샷 룰</b> 매주 한 번 포트폴리오 손익비 스냅샷을 찍는다. 투자 원칙과 별개로 세고, 금요일까지 미완료면 그날 미달이다.<br>
         룰은 하나. <b>두 번 연속 거르지 않는다.</b> 흩뿌려도 된다 — 20×5도 100이다.<br>
         빠뜨린 날은 위의 ◀ ▶ 나 14일 칸으로 돌아가 채운다. 수치만 고쳐지고 판정 기준은 그날 기준 그대로다.
+      </div>
+    </div>
+
+    <!-- ================= 시간표 (v2 주간 운동 시간표) ================= -->
+    <div id="screen-plan" style="display:none">
+      <div class="plan-head">
+        <span class="strip-title">주간 운동 시간표</span>
+        <span class="plan-hint">실제로 한 슬롯은 오늘 화면에서 누른다</span>
+      </div>
+      <div class="btns seg plan-weeks" id="planWeeks" role="group" aria-label="주 선택"></div>
+      <p class="plan-inherit" id="planInherit" hidden></p>
+      <div class="plan-ledger" id="planRows"></div>
+      <div class="plan-foot">
+        <span class="plan-count mono" id="planCount"></span>
+        <span class="plan-caption">아침 슬롯의 전제는 전날 23시 취침.</span>
       </div>
     </div>
 
@@ -116,7 +136,7 @@
         </div>
         <div class="wife-line" id="wifeLine"></div>
         <div class="table-note">
-          습관별 정상 = 그 습관 목표만 충족한 날 / 장부·루틴 달성 캘린더 정상 = 일간 습관 모두 + 가슴 펴기 O + 송은 X 없음.
+          습관별 정상 = 그 습관 목표만 충족한 날 / 장부와 루틴 달성 캘린더의 정상 = 일간 습관 모두 + 가슴 펴기 O + 송은 X 없음 + 평일 운동 슬롯.
           투자 원칙(주), 손익비 스냅샷(주) = 금요일까지 정상, 주말 완료 최소, 일요일까지 미완료 미달.
           진행 중인 주는 제외하며 금요일이 속한 달에 집계한다.
           두 기준이 다르므로 회고 인용 시 구분할 것.
@@ -124,13 +144,14 @@
       </div>
 
       <div class="month-section" id="monthSection" style="display:none">
-        <div class="strip-head"><span class="strip-title">월별 장부</span></div>
-        <div class="ledger-wrap">
-          <table class="ledger">
-            <thead><tr><th>월</th><th>정상</th><th>최소</th><th>미달</th><th>정상률</th></tr></thead>
+        <div class="strip-head"><span class="strip-title">월별 장부</span><span class="legend">확정일 기준, 오늘 제외</span></div>
+        <div class="ledger-wrap scroll-x">
+          <table class="ledger compact month-ledger">
+            <thead><tr><th>월</th><th>정상</th><th>최소</th><th>미달</th><th>정상률</th><th>슬롯</th><th>송은 X</th></tr></thead>
             <tbody id="monthBody"></tbody>
           </table>
         </div>
+        <div class="table-note">슬롯 = 운동 슬롯을 한 평일 / 슬롯 조건이 있던 평일(시간표 시작일부터). 송은 X = 송은 X 일수.</div>
       </div>
     </div>
 
@@ -175,12 +196,20 @@
           <button class="btn" id="importBtn">붙여넣어 가져오기</button>
         </div>
         <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+        <div class="settings-note">
+          가져오기는 <b>합치기</b>다. 같은 날짜는 가져온 기록으로 덮어쓰고 시작일은 더 이른 쪽을 쓴다.
+          v1 내보내기와 routine-v2 프로토타입 JSON도 받는다. 통째로 바꾸려면 기록 초기화 뒤 가져온다.
+        </div>
       </div>
 
       <div class="settings-section">
         <div class="strip-head"><span class="strip-title">데이터</span></div>
         <div class="settings-btns">
           <button class="btn danger" id="resetBtn">기록 초기화</button>
+        </div>
+        <div class="settings-btns reset-confirm" id="resetConfirm" hidden>
+          <button class="btn danger" id="resetConfirmBtn">정말 전부 삭제, 되돌릴 수 없음</button>
+          <button class="btn" id="resetCancelBtn">취소</button>
         </div>
         <div class="settings-info" id="settingsInfo"></div>
       </div>
@@ -190,6 +219,7 @@
 
 <nav class="tabbar" id="tabbar" style="display:none">
   <button class="tab active" data-tab="today">오늘</button>
+  <button class="tab" data-tab="plan">시간표</button>
   <button class="tab" data-tab="trends">추이</button>
   <button class="tab" data-tab="iron">헬스</button>
   <button class="tab" data-tab="settings">설정</button>

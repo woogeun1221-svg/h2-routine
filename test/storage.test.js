@@ -15,11 +15,14 @@ const KEY = 'h2-routine-v1';
 describe('load — 손상 데이터 처리', () => {
   beforeEach(() => mem.clear());
 
-  it('기존 일간 기록은 그대로 두고 주간 루틴, 턱걸이 활성일, 스쿼트 종료일, 가슴 펴기 활성일만 추가', () => {
+  it('기존 일간 기록은 그대로 두고 주간 루틴, 턱걸이 활성일, 스쿼트 종료일, 가슴 펴기 활성일, 운동 슬롯 활성일과 v2 표시만 추가', () => {
     const state = { startDate: '2026-06-29', days: { '2026-06-29': { p: 100, s: 100, r: 20, w: 'o' } } };
     mem.set(KEY, JSON.stringify(state));
     const loaded = load('2026-07-23');
-    expect(loaded).toEqual({ ...state, investmentReviewStart: '2026-07-23', rrSnapshotStart: '2026-07-23', pullupStart: '2026-07-23', squatEnd: '2026-07-23', postureStart: '2026-07-23' });
+    expect(loaded).toEqual({
+      ...state, v: 2, investmentReviewStart: '2026-07-23', rrSnapshotStart: '2026-07-23', pullupStart: '2026-07-23',
+      squatEnd: '2026-07-23', postureStart: '2026-07-23', exerciseSlotStart: '2026-07-23'
+    });
     expect(loaded.days).toEqual(state.days);
     expect(mem.has(KEY + '.bak')).toBe(false);
   });
@@ -49,10 +52,12 @@ describe('load — 손상 데이터 처리', () => {
     expect(mem.get(KEY + '.bak')).toBe(bad);
   });
 
-  it('save 후 load 라운드트립', () => {
+  it('save 후 load 라운드트립 (v2 필드 포함)', () => {
     const state = {
-      startDate: '2026-07-01', investmentReviewStart: '2026-07-20', rrSnapshotStart: '2026-07-20', pullupStart: '2026-07-21', squatEnd: '2026-07-22',
-      postureStart: '2026-07-22', days: { '2026-07-22': { p: 30, s: 30, t: 5, r: 5, w: null, c: 'o', i: true, rr: true } }
+      v: 2, startDate: '2026-07-01', investmentReviewStart: '2026-07-20', rrSnapshotStart: '2026-07-20', pullupStart: '2026-07-21', squatEnd: '2026-07-22',
+      postureStart: '2026-07-22', exerciseSlotStart: '2026-07-22',
+      days: { '2026-07-22': { p: 30, s: 30, t: 5, r: 5, w: null, c: 'o', i: true, rr: true, e: 'noon' } },
+      plans: { '2026-07-20': { 1: 'am', 2: 'noon', 3: 'run', 4: 'am', 5: 'am', m2: '송은 야근' } }
     };
     save(state);
     expect(load('2026-07-23')).toEqual(state);

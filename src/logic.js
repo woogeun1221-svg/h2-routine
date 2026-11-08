@@ -45,14 +45,25 @@ export function checksMarked(state, ds) {
 export const INVESTMENT_REVIEW = {
   key: 'i', name: '투자 원칙 정독·검토', sub: '매주 1회 · 목·금 권장', startKey: 'investmentReviewStart',
   action: '정독·검토 완료', upcoming: '목·금 권장 · 지금 미리 완료할 수 있음', open: '권장일 — 오늘 또는 내일',
-  statName: '투자 원칙(주)'
+  statName: '투자 원칙(주)', gap: '투자 원칙 검토'
 };
 export const RR_SNAPSHOT = {
   key: 'rr', name: '손익비 스냅샷', sub: '매주 1회, 금요일까지', startKey: 'rrSnapshotStart',
   action: '스냅샷 완료', upcoming: '금요일 장 마감 뒤 권장, 지금 미리 완료할 수 있음', open: '권장일, 오늘 또는 내일',
-  statName: '손익비 스냅샷(주)', link: 'https://macmini.taile484c7.ts.net/rr/'
+  statName: '손익비 스냅샷(주)', link: 'https://macmini.taile484c7.ts.net/rr/', gap: '손익비 스냅샷'
 };
 export const WEEKLIES = [INVESTMENT_REVIEW, RR_SNAPSHOT];
+
+/* 운동 슬롯(v2, 2026-11-08 추가) — 평일(월~금)엔 주간 시간표의 슬롯 하나(아침, 점심, 저녁런닝)를 해야 '정상'이다.
+   최소 판정에는 영향이 없고, 주말은 송은 시간이라 슬롯 조건이 없다(기록만 남길 수 있다).
+   exerciseSlotStart(업데이트 후 처음 연 날)부터 판정해 지난 평일 정상을 소급해 최소로 바꾸지 않는다.
+   그날 실제로 한 슬롯은 day.e, 주간 계획은 state.plans['월요일 날짜'] = { 1..5: 슬롯, m1..m5: 메모 }.
+   cutoff는 그 슬롯이 지났다고 보는 한국 시간(시)이다. */
+export const SLOTS = { am: '아침', noon: '점심', run: '저녁런닝' };
+export const SLOT_ORDER = ['am', 'noon', 'run'];
+export const SLOT_CUTOFF = { am: 10, noon: 14, run: 21 };
+export const EXERCISE_SLOT = { key: 'e', name: '운동 슬롯', startKey: 'exerciseSlotStart' };
+export function isSlot(v) { return SLOT_ORDER.indexOf(v) >= 0; }
 
 /* 습관 하나의 유효 목표치와 활성 구간 — state.settings의 오버라이드를 HABITS 기본값 위에 적용.
    settings가 없거나 값이 이상하면 기본값 (v1 데이터 호환). since/until은 날짜 문자열 또는 null. */
@@ -106,6 +117,56 @@ export function daysBetween(a, b) {
 }
 var WD = ['일', '월', '화', '수', '목', '금', '토'];
 export function weekday(ds) { var p = ds.split('-'); return WD[new Date(+p[0], +p[1] - 1, +p[2]).getDay()]; }
+/* 요일 번호 0=일 … 6=토. 시간표의 평일 키 1~5(월~금)와 같은 번호다. */
+export function dow(ds) { var p = ds.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]).getDay(); }
+export function isWeekend(ds) { var g = dow(ds); return g === 0 || g === 6; }
+export function mondayOf(ds) { return shift(ds, -((dow(ds) + 6) % 7)); }
+
+/* ISO 8601 주차 — 그 주 목요일이 속한 해에서 몇 번째 주인가. 노션 플래너와 같은 번호
+   (2026-11-02~08 = 45주, 2026-11-09 = 46주). 2026년은 목요일에 시작해 53주까지 있다. */
+export function isoWeek(ds) {
+  var p = ds.split('-');
+  var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  var yearStart = Date.UTC(d.getUTCFullYear(), 0, 1);
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+}
+
+/* 지금 한국 시간의 시(0~23) — todayStr와 같은 기준이라 기기 시간대가 달라도 슬롯 안내가 어긋나지 않는다. */
+export function seoulHour(now) {
+  var parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul', hour: '2-digit', hourCycle: 'h23'
+  }).formatToParts(now || new Date());
+  for (var i = 0; i < parts.length; i++) if (parts[i].type === 'hour') return +parts[i].value % 24;
+  return 0;
+}
+
+/* ---------- 주간 운동 시간표 ---------- */
+/* monday 주의 계획. 그 주 계획이 없으면 그 전 가장 가까운 주의 슬롯을 물려받고, 그것도 없으면 전부 아침.
+   메모는 그 주 것만 쓴다(물려받지 않는다). 반환 { 1..5: 슬롯, m1..m5: 메모(있을 때만) }. */
+export function planFor(state, monday) {
+  var plans = state.plans || {}, own = plans[monday], src = own, i;
+  if (!src) {
+    var prev = null;
+    Object.keys(plans).forEach(function (k) { if (k < monday && (!prev || k > prev)) prev = k; });
+    src = prev ? plans[prev] : null;
+  }
+  var plan = {};
+  for (i = 1; i <= 5; i++) plan[i] = (src && isSlot(src[i])) ? src[i] : 'am';
+  if (own) for (i = 1; i <= 5; i++) if (typeof own['m' + i] === 'string' && own['m' + i]) plan['m' + i] = own['m' + i];
+  return plan;
+}
+/* 그 주 계획이 직접 저장돼 있는가(아니면 물려받은 계획을 보여 주는 중). */
+export function hasOwnPlan(state, monday) { return !!(state.plans && state.plans[monday]); }
+/* 그날 계획 슬롯 — 주말은 null. */
+export function plannedSlot(state, ds) { return isWeekend(ds) ? null : planFor(state, mondayOf(ds))[dow(ds)]; }
+/* 그날 판정에 운동 슬롯이 들어가는가 — 평일이고 활성일 이후. */
+export function slotRequired(state, ds) {
+  var since = state[EXERCISE_SLOT.startKey];
+  return typeof since === 'string' && ds >= since && !isWeekend(ds);
+}
+/* 시간표 탭을 열 때 기본 주 — 토일엔 다음 주(1), 평일엔 이번 주(0). */
+export function defaultPlanOffset(today) { return isWeekend(today) ? 1 : 0; }
 
 /* 투자 원칙 검토 주간은 월요일 시작, 어느 날이든 한 번 완료할 수 있다.
    금요일까지의 완료 여부로 금요일 일간 판정을 정하고, 목·금은 권장일이다.
@@ -168,6 +229,7 @@ export function statusOf(state, ds) {
       full = false; min = false; // 금요일까지 거르면 그날 전체 미달
     }
   });
+  if (slotRequired(state, ds) && !isSlot(d.e)) full = false; // 평일 운동 슬롯은 정상 조건, 최소에는 영향 없음
   return full ? 'full' : (min ? 'min' : 'miss');
 }
 
@@ -185,7 +247,62 @@ export function completion(state, ds) {
       count++;
     }
   });
+  if (slotRequired(state, ds)) { sum += isSlot(d.e) ? 1 : 0; count++; } // 평일 슬롯도 정상까지의 진척에 넣는다
   return sum / count;
+}
+
+/* 그날 무엇이든 기록했는가 — 오늘 캔들과 캘린더에서 '진행중(무색)'과 현재 상태 표시를 가른다. */
+export function dayRecorded(state, ds) {
+  var rec = getDay(state, ds);
+  return completion(state, ds) > 0 || !!rec.w || checksMarked(state, ds) || isSlot(rec.e) ||
+    WEEKLIES.some(function (item) { return rec[item.key]; });
+}
+
+/* 다음 단계까지 남은 것 — 오늘 화면의 '정상까지', '최소까지' 줄.
+   full은 정상까지, min은 최소까지(미달일 때 쓴다). wifeX면 그날은 무엇을 해도 미달이다. */
+export function gapsOf(state, ds) {
+  var d = getDay(state, ds), full = [], min = [];
+  if (slotRequired(state, ds) && !isSlot(d.e)) full.push(EXERCISE_SLOT.name);
+  goalsOf(state, ds).forEach(function (g) {
+    var v = d[g.key] || 0, unit = g.unit === '분' ? '분' : '';
+    if (v < g.target) full.push(g.name + ' ' + (g.target - v) + unit);
+    if (v < g.min) min.push(g.name + ' ' + (g.min - v) + unit);
+  });
+  checksOf(state, ds).forEach(function (item) {
+    if (d[item.key] !== 'o') { full.push(item.name + ' O'); min.push(item.name + ' O'); }
+  });
+  WEEKLIES.forEach(function (item) {
+    var review = weeklyStatus(state, ds, item);
+    if (review.active && ds === review.friday && !review.done) { full.push(item.gap); min.push(item.gap); }
+  });
+  return { full: full, min: min, wifeX: d.w === 'x' };
+}
+
+/* 운동 슬롯 안내 문구. live=true(오늘)면 한국 시간 hour로 시간 경과 안내를 붙인다.
+   계획 슬롯이 지나면 아직 시각이 남은 뒷 슬롯이 백업이다(아침 → 점심 → 퇴근 런닝).
+   tone: done 완료, plan 대기, warn 백업 필요, lost 오늘 슬롯 끝, off 주말. */
+export function slotGuidance(state, ds, hour, live) {
+  var planned = plannedSlot(state, ds), actual = getDay(state, ds).e;
+  if (!isSlot(actual)) actual = null;
+  if (!planned) {
+    return actual ? { tone: 'done', text: SLOTS[actual] + ' 기록됨. 주말은 상태에 영향 없음.' } :
+      { tone: 'off', text: '시간표 없음. 했으면 기록만, 상태엔 영향 없음.' };
+  }
+  if (actual) {
+    return { tone: 'done', text: actual === planned ? '계획대로 완료.' : '계획 ' + SLOTS[planned] + ' → 실제 ' + SLOTS[actual] + '.' };
+  }
+  if (!live) return { tone: 'lost', text: '슬롯 비었음. 그날은 최소 포지션까지만 찍힌다.' };
+  if (hour < SLOT_CUTOFF[planned]) return { tone: 'plan', text: '슬롯을 비우면 오늘은 최소 포지션까지만 찍힌다.' };
+  var backups = SLOT_ORDER.slice(SLOT_ORDER.indexOf(planned) + 1).filter(function (s) { return hour < SLOT_CUTOFF[s]; });
+  if (!backups.length) {
+    var reps = goalsOf(state, ds).filter(function (g) { return g.unit === '회'; }).map(function (g) { return g.name; });
+    return { tone: 'lost', text: '오늘 슬롯 비었음. 최소 포지션' + (reps.length ? '(' + reps.join(', ') + ')' : '') + '으로 마감.' };
+  }
+  var names = backups.map(function (s) { return s === 'run' ? '퇴근 런닝' : SLOTS[s]; });
+  return {
+    tone: 'warn',
+    text: SLOTS[planned] + ' 슬롯 지남. ' + (names.length > 1 ? '백업 순서: ' : '백업: ') + names.join(' → ') + '.'
+  };
 }
 
 /* 스트릭 = 최소 이상 연속일. 오늘이 미달(미기록 포함)이면 어제부터 센다 — 오늘은 진행중. */
@@ -250,10 +367,10 @@ export function monthList(state, today) {
    'future' = 오늘 이후
    'pending'= 오늘인데 아직 아무 기록 없음 (진행중 — 미달 아님, v1 스트립과 동일 규칙)
    'full'|'min'|'miss' = 확정 상태 (오늘도 기록이 있으면 현재 상태로 표시)
-   lead = 1일의 요일(0=일) — 첫 줄 공백 칸 수 */
+   lead = 첫 줄 공백 칸 수. v2부터 월요일 시작(월=0 … 일=6) — 시간표, ISO 주차와 같은 주 단위. */
 export function calMonth(state, ym, today) {
   var p = (ym + '-01').split('-');
-  var lead = new Date(+p[0], +p[1] - 1, 1).getDay();
+  var lead = (new Date(+p[0], +p[1] - 1, 1).getDay() + 6) % 7;
   var n = daysInMonth(ym);
   var cells = [];
   for (var d = 1; d <= n; d++) {
@@ -261,12 +378,8 @@ export function calMonth(state, ym, today) {
     var kind;
     if (ds < state.startDate) kind = 'out';
     else if (ds > today) kind = 'future';
-    else if (ds === today) {
-      var rec = getDay(state, ds);
-      var recorded = completion(state, ds) > 0 || rec.w || checksMarked(state, ds) ||
-        WEEKLIES.some(function (item) { return rec[item.key]; });
-      kind = recorded ? statusOf(state, ds) : 'pending';
-    } else kind = statusOf(state, ds);
+    else if (ds === today) kind = dayRecorded(state, ds) ? statusOf(state, ds) : 'pending';
+    else kind = statusOf(state, ds);
     cells.push({ ds: ds, day: d, kind: kind });
   }
   return { lead: lead, cells: cells };
@@ -371,22 +484,26 @@ export function habitMonthStats(state, ym, today) {
   return { total: total, habits: habits, checks: checks, weeklies: weeklies, investment: weeklyMonthStats(state, ym, today, INVESTMENT_REVIEW), w: w };
 }
 
-/* 월별 장부 — startDate부터 어제까지, 최신 월부터. */
+/* 월별 장부 — startDate부터 어제까지(확정일, 오늘 제외), 최신 월부터.
+   slotDone/slotDays = 운동 슬롯을 한 평일 / 슬롯 조건이 있던 평일(활성일부터), wifeX = 송은 X 일수. */
 export function monthlyRows(state, today) {
   var yest = shift(today, -1);
   if (yest < state.startDate) return [];
   var map = {}, order = [], cur = state.startDate;
   while (cur <= yest) {
-    var mk = cur.slice(0, 7);
-    if (!map[mk]) { map[mk] = { full: 0, min: 0, miss: 0 }; order.push(mk); }
+    var mk = cur.slice(0, 7), d = getDay(state, cur);
+    if (!map[mk]) { map[mk] = { full: 0, min: 0, miss: 0, slotDone: 0, slotDays: 0, wifeX: 0 }; order.push(mk); }
     map[mk][statusOf(state, cur)]++;
+    if (slotRequired(state, cur)) { map[mk].slotDays++; if (isSlot(d.e)) map[mk].slotDone++; }
+    if (d.w === 'x') map[mk].wifeX++;
     cur = shift(cur, 1);
   }
   return order.reverse().map(function (mk) {
     var r = map[mk], total = r.full + r.min + r.miss;
     return {
       label: mk.slice(2).replace('-', '.'), full: r.full, min: r.min, miss: r.miss,
-      rate: Math.round(r.full / total * 100)
+      rate: Math.round(r.full / total * 100),
+      slotDone: r.slotDone, slotDays: r.slotDays, wifeX: r.wifeX
     };
   });
 }

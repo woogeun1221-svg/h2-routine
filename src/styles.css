@@ -372,6 +372,95 @@ td.empty { text-align: center !important; color: var(--faint); font-family: 'IBM
 .settings-info b { color: var(--muted); font-weight: 600; }
 .settings-todo { color: var(--faint); font-style: normal; opacity: .8; }
 
+/* ---------- v2: 운동 슬롯 블록, 현재 포지션 줄 (오늘) ---------- */
+#slotBlock[hidden], #planInherit[hidden], #resetBtn[hidden], #resetConfirm[hidden] { display: none; }
+.slot-card { margin-top: 14px; }
+.slot-plan { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .02em; white-space: nowrap; }
+.slot-seg .btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  color: var(--muted);
+}
+.slot-seg .btn.planned { color: var(--text); border-color: var(--faint); }
+.slot-seg .btn.sel-o { color: var(--red); border-color: rgba(232,72,63,.6); }
+.slot-tag { font-family: 'IBM Plex Mono', monospace; font-size: 9px; font-weight: 600; letter-spacing: .1em; opacity: .75; }
+.slot-note { margin-top: 10px; font-size: 12px; line-height: 1.55; color: var(--muted); word-break: keep-all; }
+.slot-card.tone-done .slot-note { color: var(--red); }
+.slot-card.tone-warn { border-color: rgba(217,164,65,.55); }
+.slot-card.tone-lost { border-color: rgba(217,164,65,.3); }
+.slot-card.tone-warn .slot-note, .slot-card.tone-lost .slot-note { color: var(--brass); }
+.slot-card.weekend .card-sub, .slot-card.weekend .slot-plan { color: var(--brass); }
+
+.posline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 14px; padding: 0 2px; }
+.posline:empty { display: none; }
+.pill {
+  display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; letter-spacing: .04em; white-space: nowrap;
+}
+.pill.full { color: var(--red); background: var(--red-dim); }
+.pill.min { color: var(--brass); background: var(--brass-dim); }
+.pill.miss { color: var(--blue); background: var(--blue-dim); }
+.pos-gap { min-width: 0; font-size: 12px; line-height: 1.55; color: var(--muted); word-break: keep-all; }
+.pos-gap b { font-weight: 600; margin-right: 2px; }
+.pos-gap b.to-min { color: var(--brass); }
+.pos-gap b.to-full { color: var(--red); }
+.pos-gap.sub { flex-basis: 100%; color: var(--faint); }
+
+/* 토일 라벨은 황동 (14일 스트립 날짜, 캘린더 요일 헤더) */
+.day-label.we:not(.today) { color: var(--brass); }
+.cal-wd .we { color: var(--brass); }
+
+/* ---------- v2: 시간표 ---------- */
+.plan-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-top: 18px; }
+.plan-hint { font-size: 11px; color: var(--faint); }
+.plan-weeks { margin-top: 12px; }
+.plan-weeks .btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 54px; color: var(--muted);
+}
+.week-label { font-size: 14px; font-weight: 600; }
+.week-meta { font-size: 10px; font-weight: 500; letter-spacing: .04em; opacity: .85; }
+.plan-inherit { margin-top: 10px; padding: 0 3px; font-size: 11px; line-height: 1.6; color: var(--brass); word-break: keep-all; }
+.plan-ledger {
+  margin-top: 12px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 14px; overflow: hidden;
+}
+.plan-row { padding: 12px 14px 13px; }
+.plan-row + .plan-row { border-top: 1px solid var(--line); }
+.plan-row.past { opacity: .6; }
+.plan-row.we { padding: 11px 14px; background: rgba(217,164,65,.035); }
+.plan-row-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.plan-date { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.plan-date .mono { font-size: 13px; color: var(--muted); margin-right: 1px; }
+.plan-row.we .plan-date, .plan-row.we .plan-date .mono { color: var(--brass); }
+.today-tag {
+  margin-left: 7px; padding: 2px 6px; border-radius: 5px; vertical-align: 1px;
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; color: var(--red); background: var(--red-dim);
+}
+.plan-note { min-width: 0; font-size: 11px; color: var(--faint); text-align: right; }
+.plan-note.we, .plan-note.moved { color: var(--brass); }
+.plan-note.done { color: var(--red); }
+.plan-seg { margin-top: 10px; }
+.plan-seg .btn { min-height: 42px; color: var(--muted); }
+.seg .btn.sel-plan { background: var(--text); color: var(--bg); border-color: var(--text); }
+.plan-memo {
+  display: block; width: 100%; min-height: 40px; margin-top: 8px; padding: 8px 11px;
+  background: var(--surface2); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+  font: inherit; font-size: 16px; /* 16px 미만이면 iOS가 확대한다 */
+}
+.plan-memo::placeholder { color: var(--faint); }
+.plan-memo:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
+.plan-foot { display: flex; flex-direction: column; gap: 3px; margin-top: 12px; padding: 0 3px; }
+.plan-count { font-size: 13px; font-weight: 600; color: var(--text); }
+.plan-caption { font-size: 11px; color: var(--faint); }
+
+/* ---------- v2: 월별 장부 7열 — 좁은 폭에선 표 안에서만 가로로 민다 ---------- */
+.ledger-wrap.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.ledger.month-ledger th, table.ledger.month-ledger td { padding: 9px 4px; white-space: nowrap; }
+table.ledger.month-ledger th:first-child, table.ledger.month-ledger td:first-child { padding-left: 10px; }
+table.ledger.month-ledger th:last-child, table.ledger.month-ledger td:last-child { padding-right: 10px; }
+td.c-slot { color: var(--text); }
+td.c-wx { color: var(--muted); }
+
 /* ---------- 헬스 탭 (Iron Terminal 마운트 컨테이너) ----------
    .app 의 좌우 18px 패딩을 상쇄해 Iron 헤더·보조 메뉴를 화면 폭 그대로 쓴다.
    Iron 자체 스타일은 빌드 시 .iron-root 아래로만 적용된다. */

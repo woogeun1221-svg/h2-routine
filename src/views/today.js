@@ -1,12 +1,16 @@
-/* 오늘 화면 렌더 — 일간 카드와 주간 투자 원칙 검토.
-   h(핸들러): { addVal, undoVal, setDirect, toggleW, toggleCheck(key, v), toggleWeekly(key), selectDay, undoStack }.
+/* 오늘 화면 렌더 — 일간 카드와 주간 투자 원칙 검토, v2 운동 슬롯 블록과 현재 포지션 줄.
+   h(핸들러): { addVal, undoVal, setDirect, toggleW, toggleCheck(key, v), toggleWeekly(key), toggleSlot(slot), selectDay, undoStack, hour? }.
+   hour는 테스트용 한국 시간(시) 고정값이고, 없으면 지금 시각을 쓴다.
    day를 주면 그날(과거) 기록을 보여 주고 카드 입력이 그날에 쓰인다 — 연속 생존, 이달 정상, 어제 미달 배너는
    항상 오늘(t) 기준이다. 카드 목록은 goalsOf(state, day)라 그날 활성이던 습관(은퇴 전 스쿼트 등)이 그대로 나온다. */
 import {
-  WIFE, WEEKLIES, goalsOf, checksOf, checksMarked, shift, daysBetween, weekday,
-  getDay, statusOf, completion, streak, monthFullRate, weeklyStatus
+  WIFE, WEEKLIES, SLOTS, SLOT_ORDER, EXERCISE_SLOT, goalsOf, checksOf, shift, daysBetween, weekday,
+  getDay, statusOf, completion, streak, monthFullRate, weeklyStatus, isoWeek, isWeekend, isSlot,
+  plannedSlot, slotGuidance, gapsOf, dayRecorded, seoulHour
 } from '../logic.js';
 import { renderReflection } from './reflection.js';
+
+var POSITION = { full: '정상', min: '최소', miss: '미달' };
 
 export function renderToday(state, t, h, day) {
   day = day || t;
@@ -15,6 +19,8 @@ export function renderToday(state, t, h, day) {
   var p = day.split('-');
   document.getElementById('dateStr').textContent = p[0] + '.' + p[1] + '.' + p[2] + ' ' + weekday(day);
   document.getElementById('dplus').textContent = 'D+' + (daysBetween(state.startDate, day) + 1);
+  var weekNo = document.getElementById('weekNo');
+  if (weekNo) weekNo.textContent = 'W' + isoWeek(day);
   document.getElementById('dayPrev').disabled = day <= state.startDate;
   document.getElementById('dayNext').disabled = isToday;
   var notice = document.getElementById('editNotice');
@@ -26,18 +32,108 @@ export function renderToday(state, t, h, day) {
   var fr = monthFullRate(state, t);
   document.getElementById('fullRate').textContent = (fr === null) ? '—' : fr + '%';
 
-  var y = shift(t, -1);
+  /* 어제 미달이면 배너, 그제까지 미달이면 '이틀 연속 미달' — 둘 다 오늘 기준 */
+  var y = shift(t, -1), y2 = shift(t, -2);
   var show = (y >= state.startDate) && statusOf(state, y) === 'miss';
-  document.getElementById('banner').className = 'banner' + (show ? ' show' : '');
+  var twice = show && (y2 >= state.startDate) && statusOf(state, y2) === 'miss';
+  document.getElementById('banner').className = 'banner' + (show ? ' show' : '') + (twice ? ' twice' : '');
+  var bannerHead = document.getElementById('bannerHead');
+  if (bannerHead) bannerHead.textContent = twice ? '이틀 연속 미달.' : '어제 미달.';
 
-  /* 배너·룰 노트의 목표 숫자는 설정을 따라간다 (오늘 판정에 들어가는 습관만) */
+  /* 배너, 룰 노트의 목표 숫자는 설정을 따라간다 (오늘 판정에 들어가는 습관만) */
   var goals = goalsOf(state, t);
-  document.getElementById('bannerMins').textContent = goals.map(function (g) { return g.min; }).join('·');
-  document.getElementById('goalFullNums').textContent = goals.map(function (g) { return g.target; }).join(' · ');
-  document.getElementById('goalMinNums').textContent = goals.map(function (g) { return g.min; }).join(' · ');
+  document.getElementById('bannerMins').textContent = goals.map(function (g) { return g.min; }).join(', ');
+  document.getElementById('goalFullNums').textContent = goals.map(function (g) { return g.target; }).join(', ');
+  document.getElementById('goalMinNums').textContent = goals.map(function (g) { return g.min; }).join(', ');
 
+  renderSlot(state, t, h, day);
+  renderPosition(state, t, day);
   renderCards(state, day, h);
   renderStrip(state, t, h, day);
+}
+
+/* 운동 슬롯 블록 — 그날 계획 슬롯을 표시하고, 실제로 한 슬롯을 누르면 완료(다시 누르면 취소).
+   오늘이면 한국 시간으로 계획 슬롯이 지났는지 보고 백업 안내를 붙인다. 슬롯 기능 활성일 전 날짜에선 숨긴다.
+   입력 칸이 없어 1분마다 다시 그려도 안전하다(main.js의 시간 경과 갱신). */
+export function renderSlot(state, t, h, day) {
+  day = day || t;
+  var root = document.getElementById('slotBlock');
+  if (!root) return;
+  var since = state[EXERCISE_SLOT.startKey];
+  root.replaceChildren();
+  if (typeof since !== 'string' || day < since) { root.hidden = true; return; }
+  root.hidden = false;
+
+  var isToday = day === t, weekend = isWeekend(day);
+  var planned = plannedSlot(state, day), actual = getDay(state, day).e;
+  if (!isSlot(actual)) actual = null;
+  var hour = (h && typeof h.hour === 'number') ? h.hour : seoulHour();
+  var guide = slotGuidance(state, day, hour, isToday);
+  root.className = 'card slot-card tone-' + guide.tone + (weekend ? ' weekend' : '');
+
+  var top = document.createElement('div'); top.className = 'card-top';
+  var nm = document.createElement('div'); nm.className = 'card-name';
+  nm.textContent = EXERCISE_SLOT.name;
+  var sub = document.createElement('span'); sub.className = 'card-sub';
+  sub.textContent = weekend ? '주말, 송은 시간' : '평일 정상 조건';
+  nm.appendChild(sub);
+  if (!weekend && actual) {
+    var flag = document.createElement('span'); flag.className = 'done-flag full'; flag.textContent = '완료';
+    nm.appendChild(flag);
+  }
+  var plan = document.createElement('span'); plan.className = 'slot-plan mono';
+  plan.textContent = weekend ? '시간표 없음' : '계획 ' + SLOTS[planned];
+  top.append(nm, plan);
+
+  var seg = document.createElement('div'); seg.className = 'btns seg slot-seg';
+  SLOT_ORDER.forEach(function (s) {
+    var b = document.createElement('button'); b.type = 'button';
+    b.className = 'btn' + (actual === s ? ' sel-o' : '') + (planned === s ? ' planned' : '');
+    b.dataset.slot = s;
+    b.setAttribute('aria-pressed', String(actual === s));
+    b.setAttribute('aria-label', SLOTS[s] + (planned === s ? ', 계획 슬롯' : '') + (actual === s ? ', 완료' : ''));
+    var label = document.createElement('span'); label.textContent = SLOTS[s];
+    b.appendChild(label);
+    if (planned === s) {
+      var tag = document.createElement('small'); tag.className = 'slot-tag'; tag.textContent = '계획';
+      b.appendChild(tag);
+    }
+    b.addEventListener('click', function () { if (h && h.toggleSlot) h.toggleSlot(s); });
+    seg.appendChild(b);
+  });
+
+  var note = document.createElement('p'); note.className = 'slot-note';
+  note.textContent = guide.text;
+  root.append(top, seg, note);
+}
+
+/* 현재 포지션 줄 — 정상/최소/미달 pill과 다음 단계까지 남은 것. 미달이면 최소까지를 먼저 보여 준다. */
+function renderPosition(state, t, day) {
+  var root = document.getElementById('posLine');
+  if (!root) return;
+  var st = statusOf(state, day), gaps = gapsOf(state, day);
+  root.replaceChildren();
+  var pill = document.createElement('span');
+  pill.className = 'pill ' + st;
+  pill.textContent = POSITION[st] + ' 포지션';
+  root.appendChild(pill);
+
+  function line(label, items, cls) {
+    if (!items.length) return;
+    var el = document.createElement('span'); el.className = 'pos-gap' + (cls ? ' ' + cls : '');
+    var b = document.createElement('b'); b.textContent = label;
+    b.className = label === '최소까지' ? 'to-min' : 'to-full';
+    el.append(b, document.createTextNode(' ' + items.join(', ')));
+    root.appendChild(el);
+  }
+  function text(msg) {
+    var el = document.createElement('span'); el.className = 'pos-gap'; el.textContent = msg;
+    root.appendChild(el);
+  }
+  if (st === 'full') text((day === t ? '오늘' : '그날') + ' 정상 마감.');
+  else if (gaps.wifeX) text('송은 X는 그 자체로 그날 미달.');
+  else if (st === 'miss') { line('최소까지', gaps.min); line('정상까지', gaps.full, 'sub'); }
+  else line('정상까지', gaps.full);
 }
 
 function renderCards(state, t, h) {
@@ -220,18 +316,18 @@ function renderStrip(state, t, h, day) {
       var comp = completion(state, ds);
       c.style.height = Math.max(7, Math.round(comp * 100)) + '%';
       if (ds === t) {
-        c.className = 'candle today' + (comp > 0 || getDay(state, ds).w || checksMarked(state, ds) ? ' ' + statusOf(state, ds) : '');
+        c.className = 'candle today' + (dayRecorded(state, ds) ? ' ' + statusOf(state, ds) : '');
         if (comp === 0) c.style.height = '7%';
       } else {
         c.className = 'candle ' + statusOf(state, ds);
       }
-      c.title = ds + ' · ' + Math.round(comp * 100) + '%' + (getDay(state, ds).w === 'x' ? ' · X' : '');
+      c.title = ds + ', ' + Math.round(comp * 100) + '%' + (getDay(state, ds).w === 'x' ? ', 송은 X' : '');
     } else {
       c.style.height = '3px'; c.style.opacity = '.25';
     }
     slot.appendChild(c);
     var lb = document.createElement('div');
-    lb.className = 'day-label' + (ds === t ? ' today' : '');
+    lb.className = 'day-label' + (ds === t ? ' today' : '') + (isWeekend(ds) ? ' we' : '');
     lb.textContent = ds === t ? '오늘' : ds.slice(8);
     cell.appendChild(slot); cell.appendChild(lb);
     wrap.appendChild(cell);

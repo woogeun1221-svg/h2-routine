@@ -1,3 +1,46 @@
+# v2 주간 운동 시간표 — 2026-11-08
+
+## 현재 작업
+
+사용자 요청: `routine-v2.html`(v2 프로토타입)과 v2 명세를 주며 "Routine_Tracker에 넣어두었어". 명세의 '7월 v1 프로젝트가 있으면 새로 만들지 말고
+시간표를 얹고 저장 데이터를 v2로 이행' 분기. 충돌과 기본값을 계획으로 보고했고 사용자 "OK"(구현부터 배포까지).
+
+- 결정(사용자 승인): 루틴 구성은 운영 앱 그대로(명세의 4종은 7월 v1 기준). 운동 슬롯은 평일 정상 조건만, 최소와 미달엔 영향 없음.
+  활성일 `exerciseSlotStart`(처음 연 날)부터 판정해 소급 없음. 저장 키 그대로 두고 필드만 추가. 가져오기는 교체 → 합치기.
+  문구는 가운뎃점 대신 쉼표, 스쿼트 대신 현재 습관명. 스트릭 규칙 유지, 라이트 모드 보류.
+- `src/logic.js`: `SLOTS`, `SLOT_ORDER`, `SLOT_CUTOFF`(10, 14, 21시), `EXERCISE_SLOT`, `isSlot`, `dow`, `isWeekend`, `mondayOf`, `isoWeek`, `seoulHour`,
+  `planFor`(그 전 가장 가까운 주의 슬롯 상속, 메모 제외, 없으면 전부 아침), `hasOwnPlan`, `plannedSlot`, `slotRequired`, `defaultPlanOffset`(토일 1),
+  `gapsOf`(정상까지, 최소까지), `slotGuidance`(백업 순서 연쇄), `dayRecorded`. `statusOf`와 `completion`에 평일 슬롯, `calMonth` 월요일 시작,
+  `monthlyRows`에 `slotDone`, `slotDays`, `wifeX`. `WEEKLIES` 항목에 `gap` 문구.
+- `src/storage.js`: `v: 2`, `START_KEYS`에 `exerciseSlotStart`, `e`와 `plans` 검증(월요일 키, 슬롯 값, 메모 500자), `v`는 1, 2만.
+  `mergeStates`(같은 날짜는 필드 단위 덮어쓰기라 만족도 사유 보존, 시작일과 활성일, 종료일은 이른 쪽, 같은 주 계획 교체, settings는 가져온 쪽에 있을 때만, 프로토타입 `targets` 버림).
+- `src/views/plan.js`(신규 시간표), `src/views/today.js`(슬롯 블록 `renderSlot`, 포지션 줄, 이틀 연속 미달 배너, `#weekNo`, 스트립 토일 황동, 목표 숫자 쉼표 구분),
+  `src/views/trends.js`(월요일 시작, 토일 황동, 장부 `슬롯`과 `송은 X` 열), `src/main.js`(시간표 탭, `toggleSlot`, `ownPlan`, `setPlanSlot`, `setPlanMemo`(입력마다 저장, 재렌더 없음),
+  `rollOverDay`(자정에 시간표 기본 주도 재설정), `refreshSlotGuidance`(1분마다, 앱 복귀마다 슬롯 블록만), 합치기 가져오기, 초기화 2단계), `index.html`, `src/styles.css`.
+- 테스트: `test/timetable-v2.test.js` 38, `test/plan.dom.test.js` 7, `test/today-slot.dom.test.js` 14. 기존 9건은 의도된 변경으로 기대값 갱신(v2 필드, 쉼표 구분자, 월요일 시작).
+  `scripts/browser_qa.cjs`: `v2Scenario`(page.clock 한국 시간 고정, 기기 시간대 뉴욕), `--v2-only`, 기본 흐름과 라이브 스모크에 슬롯 블록, 주차, 시간표 확인.
+- `routine-v2.html`은 v1 프로토타입처럼 참조용으로 커밋(배포 산출물 아님).
+- 주의: 폰에서 업데이트된 앱을 처음 연 날이 `exerciseSlotStart`다. 오늘(일요일) 열면 내일 11-09(월)부터 평일 정상에 슬롯이 필요하다.
+
+## 검증
+
+- `npm test`: 34 files / 374 tests(기존 315 + 59). `npm run typecheck`, `npm run build` 통과.
+- `node scripts/browser_qa.cjs`: 기존 흐름 + v2 시나리오 통과, 브라우저 오류 0. 1단계 완료 조건:
+  일요일 21시 → 시간표 '다음 주 W46 11.9–11.15', 월요일 15시 습관 정상 + 슬롯 미완료 → 최소 포지션 / 슬롯 완료 → 정상 포지션,
+  토요일 습관 정상 → 슬롯 없이 정상, 월요일 '어제 미달.' 배너, v1 JSON 파일 가져오기 → 장부 `26.06 1 1 28 3% — 1`, 날짜 옆 W46.
+  그 밖에 시간 경과 안내(15시 점심 지남, 21시 마감), 계획 아침 → 실제 저녁런닝, 토요일에 다음 주(W47) 상속, 초기화 2단계, 320/390 가로 넘침 0, 장부 7열이 320px 카드 안에 들어감.
+  화면: `/private/tmp/h2-routine-qa/v2-*.png`.
+
+## 운영 반영 (사용자 "OK", 진행)
+
+1. 로컬 커밋 → `npm run deploy`(테스트, 빌드, gh-pages) → `git push origin main` → 서빙 번들 교체 확인 뒤 `node scripts/browser_qa.cjs --live-smoke`.
+
+## 남은 일
+
+- 사용자 아이폰 확인(배포 URL). 2단계(홈 화면 아이콘, 자정 롤오버, v1 JSON 가져오기 실기기), 3단계(추이 다듬기), 라이트 모드는 보류.
+
+---
+
 # 알림 두 시간 간격 — 2026-11-03
 
 ## 현재 작업

@@ -51,8 +51,8 @@ describe('renderToday DOM 스모크', () => {
     expect(cards.length).toBe(7);
     expect(cards[2].querySelector('.card-name').textContent).toContain('턱걸이');
     expect(cards[2].querySelector('.done-flag').textContent).toBe('최소');
-    expect(document.getElementById('goalFullNums').textContent).toBe('100 · 100 · 20 · 20');
-    expect(document.getElementById('bannerMins').textContent).toBe('30·30·5·5');
+    expect(document.getElementById('goalFullNums').textContent).toBe('100, 100, 20, 20');
+    expect(document.getElementById('bannerMins').textContent).toBe('30, 30, 5, 5');
     expect(document.getElementById('banner').className).not.toContain('show'); // 어제는 세 습관 기준 정상
     expect(document.getElementById('streak').textContent).toBe('2일');
   });
@@ -84,7 +84,7 @@ describe('renderToday DOM 스모크', () => {
     buttons[1].click();
     expect(toggleCheck).toHaveBeenCalledWith('c', 'x');
     expect(document.querySelectorAll('#strip .candle')[13].className).toContain('full');
-    expect(document.getElementById('goalFullNums').textContent).toBe('100 · 100 · 20'); // 목표 숫자엔 안 들어간다
+    expect(document.getElementById('goalFullNums').textContent).toBe('100, 100, 20'); // 목표 숫자엔 안 들어간다
     renderToday(state, '2026-07-22', { ...handlers, toggleCheck }, '2026-07-21');
     expect(document.querySelector('[data-check="c"]')).toBe(null);
     expect(document.querySelectorAll('#cards .card').length).toBe(6);

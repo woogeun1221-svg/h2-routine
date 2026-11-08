@@ -61,7 +61,7 @@ describe('calMonth — 히트맵 셀 분류', () => {
   it('시작 전=out, 확정=상태, 오늘 미기록=pending, 이후=future', () => {
     const s = st('2026-07-20', { '2026-07-20': FULL, '2026-07-21': ZERO });
     const cal = calMonth(s, '2026-07', '2026-07-22');
-    expect(cal.lead).toBe(3); // 2026-07-01 = 수요일
+    expect(cal.lead).toBe(2); // 2026-07-01 = 수요일, v2부터 월요일 시작
     expect(cal.cells.length).toBe(31);
     expect(cal.cells[18].kind).toBe('out');     // 19일: 시작 전
     expect(cal.cells[19].kind).toBe('full');    // 20일

@@ -1,14 +1,19 @@
 /* localStorage 저장 + JSON 내보내기/가져오기. v1 스키마에 선택 필드만 추가:
-   { startDate, investmentReviewStart?, rrSnapshotStart?, pullupStart?, squatEnd?, postureStart?, days: { date: { p, s, t?, r, w, c?, i?, rr? } } }
+   { v?, startDate, investmentReviewStart?, rrSnapshotStart?, pullupStart?, squatEnd?, postureStart?, exerciseSlotStart?,
+     days: { date: { p, s, t?, r, w, c?, i?, rr?, e? } }, plans?: { 월요일: { 1..5, m1..m5 } }, settings? }
    i=true는 그날 투자 원칙 주간 검토를, rr=true는 그날 손익비 스냅샷(2026-10-29 추가)을 완료했다는 뜻이며 요일 제한은 없다.
    t는 턱걸이(2026-10-19 추가). pullupStart는 턱걸이가 판정에 들어가는 첫날로, 처음 연 날에 채운다.
    squatEnd는 스쿼트(2026-10-29 은퇴)가 판정에서 빠지는 첫날로, 역시 처음 연 날에 채운다. 그 전 기록의 s는 그대로 판정한다.
    c는 가슴 펴기(2026-11-03 추가) o/x/null 체크이며 postureStart(처음 연 날)부터 O여야 통과한다.
-   self=o/x/null, selfReason은 하루 만족도 선택/이유이며 기존 루틴 판정과 별개다. */
-import { HABITS, WEEKLIES, CHECKS } from './logic.js';
+   self=o/x/null, selfReason은 하루 만족도 선택/이유이며 기존 루틴 판정과 별개다.
+   v2(2026-11-08): e는 그날 실제로 한 운동 슬롯(am, noon, run), plans는 월요일 날짜를 키로 한 주간 시간표,
+   exerciseSlotStart는 평일 슬롯이 정상 조건에 들어가는 첫날(처음 연 날). 저장 키는 그대로 두고 필드만 덧붙인다. */
+import { HABITS, WEEKLIES, CHECKS, EXERCISE_SLOT, isSlot, mondayOf } from './logic.js';
 
 var STORE_KEY = 'h2-routine-v1';
+export var SCHEMA_VERSION = 2;
 var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+var MEMO_MAX = 500;
 var HABIT_KEYS = HABITS.map(function (h) { return h.key; });
 /* 기능 활성일, 종료일 필드 — 없으면 처음 연 날로 채워 기존 기록을 소급 판정하지 않는다 */
 var WEEKLY_KEYS = WEEKLIES.map(function (w) { return w.key; });
@@ -16,22 +21,26 @@ var CHECK_KEYS = CHECKS.map(function (c) { return c.key; });
 var START_KEYS = WEEKLIES.map(function (w) { return w.startKey; }).concat(
   HABITS.filter(function (h) { return h.startKey; }).map(function (h) { return h.startKey; }),
   HABITS.filter(function (h) { return h.endKey; }).map(function (h) { return h.endKey; }),
-  CHECKS.map(function (c) { return c.startKey; }));
+  CHECKS.map(function (c) { return c.startKey; }),
+  [EXERCISE_SLOT.startKey]);
 
 export function freshState(today) {
-  var state = { startDate: today, days: {} };
+  var state = { v: SCHEMA_VERSION, startDate: today, days: {} };
   START_KEYS.forEach(function (k) { state[k] = today; });
   return state;
 }
 
+/* v1 → v2 이행: 빠진 활성일만 채우고 버전 표시. 기존 기록과 목표치는 손대지 않는다. */
 function activateFeatures(state, today) {
   if (today) START_KEYS.forEach(function (k) { if (!state[k]) state[k] = today; });
+  state.v = SCHEMA_VERSION;
   return state;
 }
 
 /* 유효하면 null, 아니면 오류 메시지 반환 */
 export function validateState(obj) {
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return '객체 형식이 아님';
+  if (obj.v !== undefined && obj.v !== 1 && obj.v !== SCHEMA_VERSION) return '지원하지 않는 버전: ' + obj.v;
   if (typeof obj.startDate !== 'string' || !DATE_RE.test(obj.startDate)) return 'startDate 형식 오류';
   for (var si = 0; si < START_KEYS.length; si++) {
     var sv = obj[START_KEYS[si]];
@@ -60,14 +69,37 @@ export function validateState(obj) {
       var wk = WEEKLY_KEYS[wi];
       if (d[wk] !== undefined && typeof d[wk] !== 'boolean') return k + '.' + wk + ' 값 오류';
     }
+    if (d.e !== undefined && d.e !== null && !isSlot(d.e)) return k + '.e 값 오류';
     if (d.self !== undefined && d.self !== null && d.self !== 'o' && d.self !== 'x') return k + '.self 값 오류';
     if (d.selfReason !== undefined && (typeof d.selfReason !== 'string' || d.selfReason.length > 4000)) {
       return k + '.selfReason 값 오류';
     }
   }
+  if (obj.plans !== undefined) {
+    var pe = validatePlans(obj.plans);
+    if (pe) return pe;
+  }
   if (obj.settings !== undefined) {
     var e = validateSettings(obj.settings);
     if (e) return e;
+  }
+  return null;
+}
+
+/* plans: { 'YYYY-MM-DD'(월요일): { 1..5?: 'am'|'noon'|'run', m1..m5?: 문자열 } } — 모르는 키는 무시 */
+function validatePlans(plans) {
+  if (!plans || typeof plans !== 'object' || Array.isArray(plans)) return 'plans 형식 오류';
+  var keys = Object.keys(plans);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (!DATE_RE.test(k) || mondayOf(k) !== k) return 'plans 키 오류(월요일 날짜가 아님): ' + k;
+    var p = plans[k];
+    if (!p || typeof p !== 'object' || Array.isArray(p)) return 'plans.' + k + ' 형식 오류';
+    for (var wd = 1; wd <= 5; wd++) {
+      var s = p[wd], m = p['m' + wd];
+      if (s !== undefined && s !== null && !isSlot(s)) return 'plans.' + k + '.' + wd + ' 값 오류';
+      if (m !== undefined && (typeof m !== 'string' || m.length > MEMO_MAX)) return 'plans.' + k + '.m' + wd + ' 값 오류';
+    }
   }
   return null;
 }
@@ -110,10 +142,34 @@ export function exportText(state) {
   return JSON.stringify(state);
 }
 
-/* v1 [데이터 내보내기] JSON을 받아 검증된 state 반환. 문제 있으면 throw. */
+/* [데이터 내보내기] JSON(v1, v2, routine-v2 프로토타입)을 받아 검증된 state 반환. 문제 있으면 throw.
+   프로토타입의 targets 같은 모르는 최상위 키는 mergeStates에서 버려진다(목표치는 이 기기 설정을 따른다). */
 export function importText(text, today) {
   var obj = JSON.parse(text);
   var err = validateState(obj);
   if (err) throw new Error(err);
   return activateFeatures(obj, today);
+}
+
+/* 가져오기는 합치기다(v2 명세): 같은 날짜는 가져온 기록으로 덮어쓰되 가져온 쪽에 없는 항목(만족도 사유 등)은 남기고,
+   시작일과 활성일, 종료일은 더 이른 쪽, 같은 주 계획은 가져온 계획으로 바꾼다. 목표치는 가져온 쪽에 있을 때만 따른다.
+   base, incoming 모두 검증된 state. base는 바꾸지 않고 새 state를 돌려준다.
+   요약: { added, overwritten } = 새로 생긴 날짜 수, 덮어쓴 날짜 수. */
+export function mergeStates(base, incoming) {
+  var out = JSON.parse(JSON.stringify(base)), added = 0, overwritten = 0;
+  Object.keys(incoming.days).forEach(function (k) {
+    if (out.days[k]) overwritten++; else added++;
+    out.days[k] = Object.assign({}, out.days[k] || {}, incoming.days[k]);
+  });
+  if (incoming.startDate < out.startDate) out.startDate = incoming.startDate;
+  START_KEYS.forEach(function (k) {
+    if (typeof incoming[k] === 'string' && (typeof out[k] !== 'string' || incoming[k] < out[k])) out[k] = incoming[k];
+  });
+  if (incoming.plans) {
+    out.plans = out.plans || {};
+    Object.keys(incoming.plans).forEach(function (k) { out.plans[k] = JSON.parse(JSON.stringify(incoming.plans[k])); });
+  }
+  if (incoming.settings) out.settings = JSON.parse(JSON.stringify(incoming.settings));
+  out.v = SCHEMA_VERSION;
+  return { state: out, added: added, overwritten: overwritten };
 }

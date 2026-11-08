@@ -31,8 +31,10 @@ describe('renderTrends DOM 스모크', () => {
     expect(document.getElementById('maxStreak').textContent).toBe('2일');
     expect(document.getElementById('calLabel').textContent).toBe('2026.07');
     expect(document.getElementById('calWd').children.length).toBe(7);
-    // 2026-07-01은 수요일 → lead 3 + 31일 = 34칸
-    expect(document.getElementById('calGrid').children.length).toBe(34);
+    // 2026-07-01은 수요일 → 월요일 시작이라 lead 2 + 31일 = 33칸
+    expect(document.getElementById('calGrid').children.length).toBe(33);
+    expect([...document.getElementById('calWd').children].map(s => s.textContent).join('')).toBe('월화수목금토일');
+    expect(document.getElementById('calWd').children[5].className).toBe('we');
     expect(document.querySelectorAll('#habitBody tr').length).toBe(3);
     expect(document.getElementById('wifeLine').textContent).toContain('O 1');
     expect(document.getElementById('habitTitle').textContent).toBe('습관별 — 26.07');

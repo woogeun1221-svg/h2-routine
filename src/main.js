@@ -7,9 +7,13 @@ import '@fontsource/ibm-plex-mono/600.css';
 import '@fontsource/ibm-plex-mono/700.css';
 import './styles.css';
 import { registerSW } from 'virtual:pwa-register';
-import { HABITS, WEEKLIES, goalsOf, todayStr, getDay, shift, monthList, shiftMonth, weeklyStatus, statusOf } from './logic.js';
-import { load, save as persist, exportText, importText, freshState } from './storage.js';
-import { renderToday } from './views/today.js';
+import {
+  HABITS, WEEKLIES, goalsOf, todayStr, getDay, shift, monthList, shiftMonth, weeklyStatus, statusOf,
+  isSlot, planFor, defaultPlanOffset
+} from './logic.js';
+import { load, save as persist, exportText, importText, freshState, mergeStates } from './storage.js';
+import { renderToday, renderSlot } from './views/today.js';
+import { renderPlan } from './views/plan.js';
 import { renderTrends } from './views/trends.js';
 import { renderSettings } from './views/settings.js';
 import { createReminderClient, reminderStatusText, parseConnectCode } from './reminders.js';
@@ -33,8 +37,10 @@ function emptyUndo() {
 var undoStack = emptyUndo();
 var renderedDate = null;
 var viewDate = null;           // null = 오늘. 과거 날짜 기록을 수정 중이면 'YYYY-MM-DD'
-var activeTab = 'today';       // 'today' | 'trends' | 'iron' | 'settings'
+var activeTab = 'today';       // 'today' | 'plan' | 'trends' | 'iron' | 'settings'
 var trendYm = null;            // 추이 화면에서 보고 있는 달 — 진입 시 이번 달로 리셋
+var planOffset = defaultPlanOffset(todayStr()); // 시간표 0=이번 주, 1=다음 주 — 진입과 자정마다 토일이면 다음 주로
+var resetArmed = false;        // 기록 초기화 2단계 확인 중
 var calendarMode = 'self';
 var archiveFilters = { month: 'all', query: '', limit: 20 };
 var reminders = createReminderClient({ onStatus: renderReminderStatus });
@@ -152,6 +158,39 @@ function toggleCheck(key, v) {
   ensureDay(t)[key] = (cur === v) ? null : v;
   save(); render();
 }
+/* 운동 슬롯(e) — 실제로 한 슬롯을 누르면 완료, 같은 슬롯을 다시 누르면 취소. 계획과 달라도 그대로 기록한다. */
+function toggleSlot(slot) {
+  if (!isSlot(slot)) return;
+  var t = targetDay();
+  var cur = getDay(state, t).e || null;
+  ensureDay(t).e = (cur === slot) ? null : slot;
+  save(); render();
+}
+/* 주간 시간표 — 처음 손대는 주는 물려받던 슬롯을 복사해 그 주 계획으로 만든 뒤 바꾼다(메모는 복사하지 않는다). */
+function ownPlan(monday) {
+  if (!state.plans) state.plans = {};
+  if (!state.plans[monday]) {
+    var inherited = planFor(state, monday), own = {};
+    for (var wd = 1; wd <= 5; wd++) own[wd] = inherited[wd];
+    state.plans[monday] = own;
+  }
+  return state.plans[monday];
+}
+function setPlanSlot(monday, wd, slot) {
+  if (!isSlot(slot) || wd < 1 || wd > 5) return;
+  ownPlan(monday)[wd] = slot;
+  save(); render();
+}
+function setPlanMemo(monday, wd, text) {
+  if (wd < 1 || wd > 5) return;
+  var plan = ownPlan(monday);
+  if (text) plan['m' + wd] = text; else delete plan['m' + wd];
+  save(); // 입력 중 재렌더하지 않아 한글 조합과 커서를 보존한다.
+}
+function setPlanOffset(offset) {
+  planOffset = offset === 1 ? 1 : 0;
+  render();
+}
 function setReflection(day, answer) {
   ensureDay(day).self = answer;
   save(); render();
@@ -195,7 +234,7 @@ function resetGoals() {
 }
 
 /* ---------- tabs ---------- */
-var SCREENS = { today: 'screen-today', trends: 'screen-trends', iron: 'screen-iron', settings: 'screen-settings' };
+var SCREENS = { today: 'screen-today', plan: 'screen-plan', trends: 'screen-trends', iron: 'screen-iron', settings: 'screen-settings' };
 
 /* ---------- 헬스 탭 (Iron Terminal, React) — 처음 열 때만 지연 로드·마운트 ----------
    Iron 은 자기 localStorage 키(ironterminal:v1)를 쓰고 루틴 기록과 섞이지 않는다.
@@ -216,8 +255,31 @@ function mountIronTab() {
 function switchTab(tab) {
   activeTab = tab;
   if (tab === 'trends') trendYm = todayStr().slice(0, 7); // 진입할 때마다 이번 달부터
+  if (tab === 'plan') planOffset = defaultPlanOffset(todayStr()); // 토일에 열면 다음 주부터
+  resetArmed = false;
   render();
   window.scrollTo(0, 0);
+}
+
+function todayHandlers() {
+  return {
+    addVal: addVal, undoVal: undoVal, setDirect: setDirect, toggleW: toggleW, toggleCheck: toggleCheck,
+    setReflection: setReflection, setReflectionReason: setReflectionReason,
+    toggleWeekly: toggleWeekly, toggleSlot: toggleSlot, selectDay: selectDay, undoStack: undoStack
+  };
+}
+
+/* 자정이 지나 '오늘'이 바뀌면 오늘 화면, 추이 달, 시간표 기본 주를 새 날짜 기준으로 되돌린다. */
+function rollOverDay() {
+  undoStack = emptyUndo(); viewDate = null;
+  if (activeTab === 'trends') trendYm = todayStr().slice(0, 7);
+  planOffset = defaultPlanOffset(todayStr());
+  render();
+}
+/* 시간 경과 안내(10시, 14시, 21시)는 날짜가 그대로여도 바뀌므로 오늘 화면의 슬롯 블록만 다시 그린다.
+   입력 칸(만족도 사유, 메모)이 있는 다른 영역은 건드리지 않는다. */
+function refreshSlotGuidance() {
+  if (activeTab === 'today') renderSlot(state, todayStr(), todayHandlers(), targetDay());
 }
 
 function render() {
@@ -233,11 +295,9 @@ function render() {
 
   if (activeTab === 'today') {
     if (viewDate && viewDate > t) viewDate = null; // 시계가 뒤로 간 경우 방어
-    renderToday(state, t, {
-      addVal: addVal, undoVal: undoVal, setDirect: setDirect, toggleW: toggleW, toggleCheck: toggleCheck,
-      setReflection: setReflection, setReflectionReason: setReflectionReason,
-      toggleWeekly: toggleWeekly, selectDay: selectDay, undoStack: undoStack
-    }, targetDay());
+    renderToday(state, t, todayHandlers(), targetDay());
+  } else if (activeTab === 'plan') {
+    renderPlan(state, t, planOffset, { setOffset: setPlanOffset, setPlanSlot: setPlanSlot, setPlanMemo: setPlanMemo });
   } else if (activeTab === 'trends') {
     if (!trendYm) trendYm = t.slice(0, 7);
     renderTrends(state, t, trendYm, {
@@ -250,10 +310,15 @@ function render() {
     mountIronTab();
   } else {
     renderSettings(state, { setGoal: setGoal });
+    renderResetArm();
     push.prefetch(); // 알림 켜기 탭 전에 서버 키를 받아 두면 권한 요청과 구독이 한 동작 안에 끝난다
   }
   renderReminderStatus();
   renderPushControls();
+}
+function renderResetArm() {
+  document.getElementById('resetBtn').hidden = resetArmed;
+  document.getElementById('resetConfirm').hidden = !resetArmed;
 }
 
 document.querySelectorAll('.tabbar .tab').forEach(function (b) {
@@ -312,6 +377,8 @@ function downloadTextFile(text, name, type) {
   }
 }
 
+/* v2부터 가져오기는 합치기: 같은 날짜는 가져온 기록으로 덮어쓰고 시작일은 더 이른 쪽(storage.mergeStates).
+   v1 내보내기, v2 백업, routine-v2 프로토타입 JSON 모두 받는다. 완전히 바꾸려면 기록 초기화 뒤 가져온다. */
 function applyImport(text) {
   var incoming;
   try {
@@ -320,13 +387,18 @@ function applyImport(text) {
     alert('가져오기 실패 — ' + (e.message || 'JSON 형식을 확인해줘.'));
     return;
   }
+  var count = Object.keys(incoming.days).length;
+  var overlap = Object.keys(incoming.days).filter(function (k) { return state.days[k]; }).length;
   var existing = Object.keys(state.days).length;
-  if (existing > 0 && !confirm('현재 기록 ' + existing + '일치를 가져온 데이터로 교체할까?')) return;
-  state = incoming;
+  if (existing > 0 && !confirm('가져온 기록 ' + count + '일치를 지금 기록에 합칠까? 같은 날짜 ' + overlap +
+    '일은 가져온 값으로 덮어쓴다.')) return;
+  var merged = mergeStates(state, incoming);
+  state = merged.state;
   undoStack = emptyUndo(); viewDate = null;
   save(); render();
   syncReflection();
-  alert('가져오기 완료 — ' + Object.keys(state.days).length + '일치 기록, 시작일 ' + state.startDate);
+  alert('가져오기 완료: 새 날짜 ' + merged.added + '일, 덮어쓴 날짜 ' + merged.overwritten + '일. 전체 ' +
+    Object.keys(state.days).length + '일치, 시작일 ' + state.startDate);
 }
 
 document.getElementById('importBtn').addEventListener('click', function () {
@@ -346,8 +418,15 @@ importFile.addEventListener('change', function () {
 
 document.getElementById('goalRestoreBtn').addEventListener('click', resetGoals);
 
+/* 기록 초기화는 2단계: [기록 초기화] → [정말 전부 삭제] 또는 [취소]. 탭을 옮기면 확인 상태가 풀린다. */
 document.getElementById('resetBtn').addEventListener('click', function () {
-  if (!confirm('모든 기록을 삭제할까? 되돌릴 수 없어.')) return;
+  resetArmed = true; renderResetArm();
+});
+document.getElementById('resetCancelBtn').addEventListener('click', function () {
+  resetArmed = false; renderResetArm();
+});
+document.getElementById('resetConfirmBtn').addEventListener('click', function () {
+  resetArmed = false;
   state = freshState(todayStr());
   undoStack = emptyUndo(); viewDate = null;
   try { persist(state); } catch (e) {}
@@ -386,21 +465,15 @@ document.addEventListener('visibilitychange', function () {
   }
   clearBadge();
   if (swRegistration) swRegistration.update().catch(function () {});
-  if (renderedDate && renderedDate !== todayStr()) {
-    undoStack = emptyUndo(); viewDate = null;
-    if (activeTab === 'trends') trendYm = todayStr().slice(0, 7);
-    render();
-  }
+  if (renderedDate && renderedDate !== todayStr()) rollOverDay();
+  else refreshSlotGuidance();
   syncReflection();
 });
 window.addEventListener('online', syncReflection);
 setInterval(function () {
   if (document.visibilityState !== 'visible') return;
-  if (renderedDate !== todayStr()) {
-    undoStack = emptyUndo(); viewDate = null;
-    if (activeTab === 'trends') trendYm = todayStr().slice(0, 7);
-    render();
-  }
+  if (renderedDate !== todayStr()) rollOverDay();
+  else refreshSlotGuidance();
   syncReflection();
 }, 60000);
 

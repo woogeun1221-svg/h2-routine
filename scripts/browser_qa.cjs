@@ -37,11 +37,196 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
+/* v2 주간 운동 시간표 — 시계를 한국 시간으로 고정해 1단계 완료 조건 다섯 개를 실제 화면에서 확인한다.
+   기기 시간대는 일부러 뉴욕(판정과 시간 안내는 한국 시간이어야 한다). 시드는 v2 이전(활성일 없음)의 운영 기록 모양. */
+const V2_FULL = { p: 100, t: 20, r: 20, w: null, c: 'o' };
+const v2Seed = {
+  startDate: '2026-07-23', investmentReviewStart: '2026-08-19', rrSnapshotStart: '2026-10-29',
+  pullupStart: '2026-10-19', squatEnd: '2026-10-29', postureStart: '2026-11-03',
+  days: {
+    '2026-11-06': { ...V2_FULL, i: true, rr: true },          // 금, 주간 항목까지 정상(시간표 전이라 슬롯 없이 정상)
+    '2026-11-07': { ...V2_FULL, self: 'o' }                    // 토 정상, 일요일(11-08)은 비워 둔다 → 월요일에 어제 미달 배너
+  }
+};
+const v1Sample = { startDate: '2026-06-01', days: {
+  '2026-06-01': { p: 100, s: 100, r: 20, w: 'o' }, '2026-06-02': { p: 30, s: 30, r: 5, w: null }, '2026-06-03': { p: 0, s: 0, r: 0, w: 'x' }
+} };
+const kst = iso => new Date(iso + '+09:00');
+function isoWeekOf(ds) { // ISO 8601: 그 주 목요일이 속한 해의 몇 번째 주
+  const d = new Date(ds + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  return Math.ceil(((d - Date.UTC(d.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7);
+}
+const isWeekendDs = ds => [0, 6].includes(new Date(ds + 'T00:00:00Z').getUTCDay());
+
+async function v2Scenario(browser, origin) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, timezoneId: 'America/New_York', serviceWorkers: 'block' });
+  const page = await context.newPage();
+  const errors = [], dialogs = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('dialog', dialog => { dialogs.push(dialog.message()); dialog.accept(); });
+  await page.route(api + '/**', route => route.fulfill({ json: { ok: true, key: vapidKey } }));
+  await page.addInitScript(data => {
+    if (!localStorage.getItem('h2-routine-v1')) localStorage.setItem('h2-routine-v1', JSON.stringify(data));
+  }, v2Seed);
+  const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('h2-routine-v1')));
+  const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  const noDot = async selector => assert.equal((await page.locator(selector).innerText()).includes('·'), false, selector + ' 가운뎃점');
+  const card = name => page.locator('#cards .card', { hasText: name }).first();
+
+  // A. 일요일 21시: 업데이트 후 처음 연 날 → v2 이행, 시간표는 다음 주(W46)로 열린다 (완료 조건 1)
+  await page.clock.setFixedTime(kst('2026-11-08T21:00:00'));
+  await page.goto(origin + '/h2-routine/', { waitUntil: 'networkidle' });
+  let saved = await stored();
+  assert.equal(saved.v, 2);
+  assert.equal(saved.exerciseSlotStart, '2026-11-08');
+  assert.deepEqual(saved.days['2026-11-06'], v2Seed.days['2026-11-06']);
+  assert.equal(await page.locator('#weekNo').innerText(), 'W45');
+  assert.equal(await page.locator('#slotBlock').isVisible(), true);
+  assert.equal(await page.locator('#slotBlock .card-sub').innerText(), '주말, 송은 시간');
+  assert.equal(await page.locator('#cards .card').count(), 7);
+  await page.locator('[data-tab="plan"]').click();
+  assert.equal(await page.locator('#planWeeks [aria-pressed="true"]').innerText(), '다음 주\nW46 11.9–11.15');
+  assert.equal(await page.locator('#planRows .plan-row').first().getAttribute('data-day'), '2026-11-09');
+  assert((await page.locator('#planInherit').innerText()).includes('전부 아침'));
+  await page.locator('#planRows .plan-row').nth(0).locator('[data-slot="noon"]').click();
+  await page.locator('#planRows .plan-row').nth(1).locator('[data-slot="run"]').click();
+  await page.locator('#planRows .plan-row').nth(0).locator('input').fill('송은 회식');
+  saved = await stored();
+  assert.deepEqual(saved.plans['2026-11-09'], { 1: 'noon', 2: 'run', 3: 'am', 4: 'am', 5: 'am', m1: '송은 회식' });
+  assert.equal(await page.locator('#planCount').innerText(), '아침 3, 점심 1, 저녁런닝 1');
+  assert.equal(await page.locator('#planInherit').isVisible(), false);
+  await noDot('#screen-plan');
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 }); await noOverflow();
+    await page.screenshot({ path: path.join(report, 'v2-plan-sunday-' + width + '.png'), fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#planWeeks [data-offset="0"]').click();
+  assert.equal(await page.locator('#planWeeks [aria-pressed="true"]').innerText(), '이번 주\nW45 11.2–11.8');
+
+  // B. 월요일 15시: W46, 점심 계획 지남 → 백업 안내. 습관 정상 + 슬롯 미완료 → 최소, 슬롯 완료 → 정상 (완료 조건 2, 3, 5)
+  await page.clock.setFixedTime(kst('2026-11-09T15:00:00'));
+  await page.reload({ waitUntil: 'networkidle' });
+  assert.equal(await page.locator('#weekNo').innerText(), 'W46');
+  assert.equal(await page.locator('#banner').isVisible(), true);
+  assert.equal(await page.locator('#bannerHead').innerText(), '어제 미달.');
+  assert.equal(await page.locator('#slotBlock .slot-plan').innerText(), '계획 점심');
+  assert.equal(await page.locator('#slotBlock .slot-note').innerText(), '점심 슬롯 지남. 백업: 퇴근 런닝.');
+  assert.equal(await page.locator('#slotBlock [data-slot="noon"]').getAttribute('class'), 'btn planned');
+  for (let i = 0; i < 4; i++) await card('푸쉬업').locator('.btn', { hasText: '+25' }).click();
+  await card('턱걸이').locator('.btn', { hasText: '+20' }).click();
+  await card('독서').locator('.btn', { hasText: '+20' }).click();
+  await page.locator('[data-check="c"] .btn', { hasText: 'O 폈다' }).click();
+  assert.equal(await page.locator('#posLine .pill').innerText(), '최소 포지션');
+  assert.equal(await page.locator('#posLine .pos-gap').innerText(), '정상까지 운동 슬롯');
+  await page.screenshot({ path: path.join(report, 'v2-today-monday-before-slot-390.png'), fullPage: true });
+  await page.locator('#slotBlock [data-slot="noon"]').click();
+  assert.equal(await page.locator('#posLine .pill').innerText(), '정상 포지션');
+  assert.equal(await page.locator('#slotBlock .slot-note').innerText(), '계획대로 완료.');
+  assert.equal((await stored()).days['2026-11-09'].e, 'noon');
+  await page.locator('#slotBlock [data-slot="noon"]').click(); // 다시 누르면 취소
+  assert.equal(await page.locator('#posLine .pill').innerText(), '최소 포지션');
+  await page.locator('#slotBlock [data-slot="run"]').click();
+  assert.equal(await page.locator('#slotBlock .slot-note').innerText(), '계획 점심 → 실제 저녁런닝.');
+  assert.equal(await page.locator('#posLine .pill').innerText(), '정상 포지션');
+  await noDot('#slotBlock'); await noDot('#posLine'); await noDot('#banner');
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 }); await noOverflow();
+    await page.screenshot({ path: path.join(report, 'v2-today-monday-' + width + '.png'), fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('[data-tab="plan"]').click();
+  assert.equal(await page.locator('#planWeeks [aria-pressed="true"]').innerText(), '이번 주\nW46 11.9–11.15');
+  assert.equal(await page.locator('#planRows .plan-row').nth(0).locator('.plan-note').innerText(), '실제 저녁런닝');
+  await page.locator('[data-tab="today"]').click();
+
+  // 자정 경계: 시간 경과 안내는 1분 갱신으로 바뀐다(다시 그리기 없이 21시 → 마감 안내)
+  await page.locator('#slotBlock [data-slot="run"]').click(); // 취소해서 비운다
+  await page.clock.setFixedTime(kst('2026-11-09T21:05:00'));
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  assert.equal(await page.locator('#slotBlock .slot-note').innerText(), '오늘 슬롯 비었음. 최소 포지션(푸쉬업, 턱걸이)으로 마감.');
+  await page.locator('#slotBlock [data-slot="run"]').click();
+
+  // C. 토요일 12시: 습관 정상이면 슬롯 없이 정상. 시간표는 다음 주(W47)로 열리고 W46 계획을 물려받는다 (완료 조건 1, 2)
+  await page.clock.setFixedTime(kst('2026-11-14T12:00:00'));
+  await page.reload({ waitUntil: 'networkidle' });
+  for (let i = 0; i < 4; i++) await card('푸쉬업').locator('.btn', { hasText: '+25' }).click();
+  await card('턱걸이').locator('.btn', { hasText: '+20' }).click();
+  await card('독서').locator('.btn', { hasText: '+20' }).click();
+  await page.locator('[data-check="c"] .btn', { hasText: 'O 폈다' }).click();
+  assert.equal(await page.locator('#posLine .pill').innerText(), '정상 포지션');
+  assert.equal((await stored()).days['2026-11-14'].e, undefined);
+  await page.locator('[data-tab="plan"]').click();
+  assert.equal(await page.locator('#planWeeks [aria-pressed="true"]').innerText(), '다음 주\nW47 11.16–11.22');
+  assert((await page.locator('#planInherit').innerText()).includes('직전 계획을 물려받았다'));
+  assert.deepEqual(await page.locator('#planRows .plan-row [aria-pressed="true"]').evaluateAll(els => els.map(e => e.dataset.slot)),
+    ['noon', 'run', 'am', 'am', 'am']);
+  assert.equal(await page.locator('#planRows .plan-row').nth(0).locator('input').inputValue(), ''); // 메모는 물려받지 않는다
+
+  // D. v1 JSON 가져오기(합치기) → 월별 장부에 그 달이 나타난다 (완료 조건 4). 장부 7열, 캘린더 월요일 시작
+  await page.locator('[data-tab="settings"]').click();
+  await page.setInputFiles('#importFile', { name: 'v1.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(v1Sample)) });
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('h2-routine-v1')).startDate === '2026-06-01');
+  assert(dialogs.some(m => m.includes('합칠까')), '합치기 확인 창');
+  assert(dialogs.some(m => m.startsWith('가져오기 완료: 새 날짜 3일')), '완료 알림');
+  saved = await stored();
+  assert.deepEqual(saved.days['2026-06-01'], v1Sample.days['2026-06-01']);
+  assert.equal(saved.days['2026-11-09'].e, 'run');                 // 기존 기록 보존
+  assert.equal(saved.plans['2026-11-09'].m1, '송은 회식');
+  assert.equal(saved.exerciseSlotStart, '2026-11-08');             // 활성일은 더 이른 쪽(기기)
+  await page.locator('[data-tab="trends"]').click();
+  const ledger = await page.locator('#monthBody tr').evaluateAll(trs => trs.map(tr => [...tr.children].map(td => td.textContent)));
+  assert.deepEqual(ledger.at(-1), ['26.06', '1', '1', '28', '3%', '—', '1']);
+  assert.deepEqual(ledger[0].slice(0, 1).concat(ledger[0].slice(5)), ['26.11', '1/5', '0']); // 11-09~13 평일 5일 중 월요일 1일
+  assert.deepEqual(await page.locator('.month-ledger thead th').allInnerTexts(), ['월', '정상', '최소', '미달', '정상률', '슬롯', '송은 X']);
+  // 320px에서도 장부 7열이 카드 안에 다 들어간다(가로 스크롤 없이)
+  await page.setViewportSize({ width: 320, height: 844 });
+  assert.equal(await page.locator('.month-ledger').evaluate(t => t.parentElement.scrollWidth <= t.parentElement.clientWidth), true);
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal((await page.locator('#calWd').innerText()).replace(/\s/g, ''), '월화수목금토일');
+  await page.locator('[data-calendar-mode="routine"]').click();
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 }); await noOverflow();
+    await page.screenshot({ path: path.join(report, 'v2-trends-' + width + '.png'), fullPage: true });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  // E. 기록 초기화 2단계: 첫 탭은 확인 줄만, 취소하면 원래대로, 탭을 옮기면 풀린다
+  await page.locator('[data-tab="settings"]').click();
+  await page.locator('#resetBtn').click();
+  assert.equal(await page.locator('#resetConfirm').isVisible(), true);
+  assert.equal(await page.locator('#resetBtn').isVisible(), false);
+  await page.locator('#resetCancelBtn').click();
+  assert.equal(await page.locator('#resetConfirm').isVisible(), false);
+  await page.locator('#resetBtn').click();
+  await page.locator('[data-tab="today"]').click();
+  await page.locator('[data-tab="settings"]').click();
+  assert.equal(await page.locator('#resetConfirm').isVisible(), false);
+  assert.equal(Object.keys((await stored()).days).length > 0, true);
+  await page.locator('#resetBtn').click();
+  await page.locator('#resetConfirmBtn').click();
+  saved = await stored();
+  assert.deepEqual(saved.days, {});
+  assert.equal(saved.plans, undefined);
+  assert.equal(saved.exerciseSlotStart, '2026-11-14');
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 }); await noOverflow();
+  }
+  assert.deepEqual(errors, []);
+  await context.close();
+  return { v2: true, sundayOpensNextWeek: true, weekdaySlotGatesFull: true, saturdayFullWithoutSlot: true,
+    yesterdayMissBanner: true, v1ImportInLedger: true, isoWeek46: true, resetTwoStep: true };
+}
+
 (async () => {
   fs.mkdirSync(report, { recursive: true });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
   try {
+    if (process.argv.includes('--v2-only')) {
+      console.log(JSON.stringify(await v2Scenario(browser, 'http://127.0.0.1:' + server.address().port)));
+      return;
+    }
     const context = await browser.newContext({ viewport: { width: 390, height: 844 },
       timezoneId: 'America/New_York', serviceWorkers: 'block' });
     const page = await context.newPage();
@@ -59,6 +244,15 @@ const server = http.createServer((req, res) => {
       assert((await page.locator('[data-weekly="rr"]').innerText()).includes('손익비 스냅샷'));
       assert.equal(await page.locator('#cards .card .btn').first().textContent(), '+5');
       assert.equal(await page.locator('#dayPrev').isVisible(), true);
+      // v2: 운동 슬롯 블록(#cards 밖), ISO 주차, 시간표 탭(토일엔 다음 주)
+      assert.equal(await page.locator('#slotBlock').isVisible(), true);
+      assert.equal(await page.locator('#slotBlock [data-slot]').count(), 3);
+      assert.equal(await page.locator('#weekNo').textContent(), 'W' + isoWeekOf(date));
+      await page.locator('[data-tab="plan"]').click();
+      assert.equal(await page.locator('#planRows .plan-row').count(), 7);
+      assert((await page.locator('#planWeeks [aria-pressed="true"]').innerText()).startsWith(isWeekendDs(date) ? '다음 주' : '이번 주'));
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await page.screenshot({ path: path.join(report, 'production-plan-390.png'), fullPage: true });
       await page.locator('[data-tab="trends"]').click();
       assert.equal(await page.locator('#reflectionHistory .reflection-stats').count(), 1);
       assert.equal(await page.locator('[data-calendar-mode="self"]').getAttribute('aria-pressed'), 'true');
@@ -77,7 +271,8 @@ const server = http.createServer((req, res) => {
       assert.deepEqual(errors, []);
       await page.screenshot({ path: path.join(report, 'production-trends-390.png'), fullPage: true });
       console.log(JSON.stringify({ production: true, status: response.status(), questionVisible: true,
-        choices: 2, trendsAndArchiveVisible: true, ironTabMounted: true, browserErrors: errors.length, screenshot: path.join(report, 'production-trends-390.png') }));
+        choices: 2, trendsAndArchiveVisible: true, ironTabMounted: true, timetableTab: true, slotBlock: true,
+        browserErrors: errors.length, screenshot: path.join(report, 'production-trends-390.png') }));
       return;
     }
     await page.addInitScript(data => {
@@ -319,6 +514,13 @@ const server = http.createServer((req, res) => {
     assert.equal(await page.locator('#strip .day.selected').count(), 0);
     names = await page.locator('#cards .card-name').allInnerTexts();
     assert(names[1].includes('턱걸이'));
+    // v2: 시드에 활성일이 없으니 오늘 처음 연 날로 이행 → 슬롯 블록이 보이고 카드 수(7)는 그대로
+    assert.equal(await page.locator('#slotBlock').isVisible(), true);
+    assert.equal(await page.locator('#weekNo').textContent(), 'W' + isoWeekOf(date));
+    assert.equal((await page.evaluate(() => JSON.parse(localStorage.getItem('h2-routine-v1')))).exerciseSlotStart, date);
+    await page.locator('[data-tab="plan"]').click();
+    assert((await page.locator('#planWeeks [aria-pressed="true"]').innerText()).startsWith(isWeekendDs(date) ? '다음 주' : '이번 주'));
+    await page.locator('[data-tab="today"]').click();
     await page.setViewportSize({ width: 320, height: 844 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.screenshot({ path: path.join(report, 'today-320.png'), fullPage: true });
@@ -335,9 +537,10 @@ const server = http.createServer((req, res) => {
       await page.screenshot({ path: path.join(report, 'trends-' + width + '.png'), fullPage: true });
     }
     assert.deepEqual(errors, []);
+    const v2 = await v2Scenario(browser, 'http://127.0.0.1:' + server.address().port);
     console.log(JSON.stringify({ passed: true, widths: [390, 320, 1200], browserErrors: errors.length,
       legacyRecordsPreserved: true, reasonReloaded: true, crossMonthArchiveAndDownloads: true, ironTabMounted: true,
-      pastDayEdit: true, squatRetired: true, rrSnapshotWeekly: true, pushSubscribeFlow: true, apiMocked: true, screenshots: report }));
+      pastDayEdit: true, squatRetired: true, rrSnapshotWeekly: true, pushSubscribeFlow: true, apiMocked: true, ...v2, screenshots: report }));
   } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));
