@@ -1,3 +1,45 @@
+# 시간표 다시 설계, 디자인 개편, 메인컨트롤 봇 동기화 — 2026-11-08 오후
+
+## 현재 작업
+
+사용자 요청(v2 배포 뒤): "생각보다 구려. 좀 더 시간표스럽게, 데일리 기준, weekly 기준으로. 전체 디자인을 더 세련되게, 메인 컨트롤 봇이랑 송수신할 수 있을까. 쭉 진행해줘".
+
+- 시간표 탭 `src/views/plan.js` 다시 씀: `일간 | 주간` 전환(`h2-routine-plan-mode`, 기본 주간).
+  주간 = 요일 x 아침, 점심, 저녁 칸 격자(`#planGrid .tt-cell[data-day][data-slot]`, 누르면 계획 이동, 토일 `.tt-we`, 지난 날 머리 `.tt-status`), 메모 `#planMemos`.
+  일간 = 06~24시 시간축(`#planTimeline .tl-block[data-slot]`, `.tl-now`, `.tl-bed`), 이번 주 월요일~다음 주 일요일 이동, 그날 포지션.
+  1분 갱신은 `renderPlanClock`(칸과 시간축만, 메모 입력 보존). `src/logic.js`에 `SLOT_WINDOW`(06~10, 12~14, 18~21), `DAY_START/END`, `BEDTIME`, `seoulMinute`.
+- 오늘 탭 슬롯 블록에 하루 막대(`.daybar`, 세그먼트는 data-slot 없이 클래스만, 버튼 셋만 `[data-slot]`).
+- 디자인: `src/styles.css` 전면 교체(시스템 글꼴, 새 토큰, 아이콘 탭 바, `.icon-btn`, `.seg-btn`). Plex Sans KR import 제거(Plex Mono는 헬스 탭용으로 유지). 헬스 탭은 손대지 않음.
+  루틴 UI 문구와 주석의 가운뎃점 제거(투자 원칙 문구 '정독, 검토', 아카이브 내보내기 제목 등). 헬스 탭(Iron) 문구엔 가운뎃점 19곳이 남아 있다(프리셋 라벨이 저장 데이터와 엮여 이번엔 안 건드림).
+- 봇 동기화: `src/botsync.js`(요약과 계획 페이로드, `applyServerPlans` 주 단위 u 비교), `src/reminders.js` `syncState`, `src/main.js` `syncAll`(기존 보고 트리거에 같이),
+  `plans[월요일].u`(수정 시각, `validatePlans`가 검증). 서버 `scripts/reminder_service.py`: `POST /state`, 표 `plans`, `summaries`, `meta`, `bot`, `weekly` 명령,
+  루틴 알림 끝 슬롯 한 줄. 문구와 명령은 `scripts/routine_bot.py`. 봇 쪽은 `alphasense/routine_bridge.py`(신규)와 `alphasense/bot_webhook.py` 명령 분기, `/help` 한 단락.
+- 결정: 메모와 만족도 사유는 서버로 보내지 않는다(메모는 송은 일정). 이전 README의 '계획과 메모는 이 기기에만'을 이번에 바꿨다(슬롯 계획만 나감).
+  봇 버튼(인라인 키보드)은 웹훅 allowed_updates 변경이 필요해 하지 않았다. 텍스트 명령만.
+
+## 검증
+
+- `npm test` 35 files / 389 tests(시간표 DOM 14, 봇 동기화 8, 하루 막대 2 추가). `npm run build` 통과(프리캐시 20개 435KB, 한글 웹폰트 제거).
+- `/usr/bin/python3 -m unittest discover -s scripts -p 'test_*.py'` 38건(기존 21 + 17: /state 검증, 계획 충돌, 상속, 봇 명령, 주간 메시지, 알림 한 줄, 로캘 없는 하위 프로세스).
+- alphasense: `test_bot_routine_bridge` 6건 + 기존 `test_bot_newsletter_html`, `test_llm_fallback`, processors 45건 통과(.venv).
+- `node scripts/browser_qa.cjs`: 기존 흐름 + v2 시나리오(격자, 일간 보기 포함) + `botSyncScenario`(페이로드에 메모와 사유 없음, 봇 계획 적용, 메모 보존) 통과, 브라우저 오류 0.
+- 운영 DB 사본으로 `status`, `bot /시간표`, `weekly --dry-run` 확인(새 표 생성, app_idle).
+
+## 운영 반영 (2026-11-08 13:50~14:00)
+
+1. 커밋 cf7ea56. `launchctl kickstart -k gui/$(id -u)/com.woogeun.routine.api` → localhost와 Funnel `/routine-api/health` 200, `/state` 무인증 401, 운영 DB에 새 표.
+2. alphasense 봇 재시작(kickstart -k, PID 34763 → 93173). 재시작 전 확인: 다른 작업의 미커밋 모듈은 전부 10-19 13:53 프로세스 시작 전 수정이고 웹훅이 시작 때 import 하지 않음.
+   `/alphasense/bot/health` ok. `routine_bridge.run('/시간표')`로 운영 DB 경로 확인(텔레그램 발송 없이).
+3. `npm run deploy` → gh-pages 770ba43 → 5531b47(deploy cf7ea56), 번들 index-ByahW-bU.js 약 30초 뒤 서빙. `git push origin main` 1fb13a1..cf7ea56.
+4. 라이브 스모크 통과(시간표 격자 7열, 15칸, 오늘 일요일이라 다음 주 W46, 브라우저 오류 0).
+
+## 남은 일
+
+- **일요일 20시 주간 메시지 launchd 미설치**: 자동 모드 분류기가 새 launchd 등록을 막았다. 사용자가 직접:
+  `cp launchd/com.woogeun.routine.weekly.plist ~/Library/LaunchAgents/ && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.woogeun.routine.weekly.plist`
+- alphasense 변경은 미커밋: `bot_webhook.py`에 10-16 작업의 미커밋 변경이 섞여 있어 그대로 둠(새 파일 `routine_bridge.py`, `test_bot_routine_bridge.py`도 untracked).
+- 사용자 아이폰 확인: 새 디자인, 시간표 일간과 주간, 봇 DM `/시간표`, `/슬롯 화 점심` 뒤 앱을 열어 반영되는지.
+
 # v2 주간 운동 시간표 — 2026-11-08
 
 ## 현재 작업
