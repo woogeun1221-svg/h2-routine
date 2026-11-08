@@ -31,9 +31,13 @@
   그 밖에 시간 경과 안내(15시 점심 지남, 21시 마감), 계획 아침 → 실제 저녁런닝, 토요일에 다음 주(W47) 상속, 초기화 2단계, 320/390 가로 넘침 0, 장부 7열이 320px 카드 안에 들어감.
   화면: `/private/tmp/h2-routine-qa/v2-*.png`.
 
-## 운영 반영 (사용자 "OK", 진행)
+## 운영 반영 (2026-11-08 11:45~11:48, 사용자 "OK")
 
-1. 로컬 커밋 → `npm run deploy`(테스트, 빌드, gh-pages) → `git push origin main` → 서빙 번들 교체 확인 뒤 `node scripts/browser_qa.cjs --live-smoke`.
+1. 커밋 e3ea3c1 → `npm run deploy`: 테스트 374 통과, 빌드, gh-pages a9b971c → 770ba43(deploy e3ea3c1), 번들 index-CMs-wz0x.js.
+2. `git push origin main` ea30a38..e3ea3c1.
+3. 서빙 번들 폴링: 11:47:01 옛 index-iaZW0064 → 11:47:17 새 index-CMs-wz0x(약 15초).
+4. 라이브 스모크 통과(status 200, 카드 7, 슬롯 블록, 시간표 탭 7행, 오늘(일요일)이라 '다음 주 W46 11.9–11.15' 기본, 브라우저 오류 0). 화면 `/private/tmp/h2-routine-qa/production-plan-390.png`.
+   알림 서버와 launchd는 바꾸지 않았다(루틴 알림은 최소 포지션 기준이라 슬롯과 무관).
 
 ## 남은 일
 
