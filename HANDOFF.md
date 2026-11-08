@@ -32,6 +32,8 @@
    `/alphasense/bot/health` ok. `routine_bridge.run('/시간표')`로 운영 DB 경로 확인(텔레그램 발송 없이).
 3. `npm run deploy` → gh-pages 770ba43 → 5531b47(deploy cf7ea56), 번들 index-ByahW-bU.js 약 30초 뒤 서빙. `git push origin main` 1fb13a1..cf7ea56.
 4. 라이브 스모크 통과(시간표 격자 7열, 15칸, 오늘 일요일이라 다음 주 W46, 브라우저 오류 0).
+5. 리뷰 수정 f6d9d43: 메모 수정이 `plans[월요일].u`를 올리던 것을 뺐다(메모 입력 중 도착한 봇 계획이 건너뛰어지고 다음 동기화에 서버에서 덮이는 틈).
+   QA에 메모 뒤 u 불변 단언. 재배포 gh-pages 8d1c216, 번들 index-TgjDl21j.js, 라이브 스모크 통과.
 
 ## 남은 일
 
