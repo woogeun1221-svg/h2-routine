@@ -22,6 +22,7 @@
 ## 남은 일
 
 - 사용자 "오케이 넣어줄 수 있겠어? 헬스탭 상단 여백 없애줘": 헬스 머리 여백 축소(health-head 4px, Iron 상단 10px, 화면 제목 위 10px) 후 배포.
+- 운영 반영: 커밋 73288cf, gh-pages a015eab → 356c38a, push d7d4c19..73288cf, 번들 index-BZWBlidz.js 약 15초 뒤 서빙, `--live-smoke` 통과(오류 0).
 
 ---
 
