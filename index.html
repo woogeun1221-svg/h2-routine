@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0C0E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="H2 루틴">
+<link rel="icon" href="/h2-routine/icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/h2-routine/icons/apple-touch-icon.png">
+<title>H2 강제 루틴</title>
+  <script type="module" crossorigin src="/h2-routine/assets/index-DfVU457C.js"></script>
+  <link rel="stylesheet" crossorigin href="/h2-routine/assets/index-B29G7B9H.css">
+<link rel="manifest" href="/h2-routine/manifest.webmanifest"></head>
+<body>
+<div class="app">
+  <div id="loading" class="loading">불러오는 중…</div>
+
+  <div id="main" style="display:none">
+    <div class="eyebrow">
+      <span>H2 강제 루틴 — 지덕체</span>
+      <span class="save-state" id="saveState"></span>
+    </div>
+
+    <!-- ================= 오늘 ================= -->
+    <div id="screen-today">
+      <div class="date-row">
+        <h1 class="date"><span id="dateStr"></span><span class="date-meta"><span class="dplus wkno" id="weekNo"></span><span class="dplus" id="dplus"></span></span></h1>
+        <div class="day-nav" role="group" aria-label="기록 날짜 이동">
+          <button class="icon-btn" id="dayPrev" aria-label="전날 기록">‹</button>
+          <button class="icon-btn" id="dayNext" aria-label="다음날 기록">›</button>
+        </div>
+      </div>
+      <div class="edit-notice" id="editNotice">
+        <span id="editNoticeText"></span>
+        <button class="btn" id="todayBtn">오늘로</button>
+      </div>
+
+      <!-- 27 담금질(사이드 프로젝트, 루틴 판정과 별개): 오늘 화면 맨 위. #cards 밖에 둔다 -->
+      <section id="forgeBlock" class="card forge-card" aria-label="27 담금질" hidden></section>
+
+      <section id="reflection" class="card reflection-card" aria-label="하루 만족도"></section>
+
+      <div class="chips">
+        <div class="chip">연속 생존<b id="streak">0일</b></div>
+        <div class="chip">이달 정상<b id="fullRate">—</b></div>
+      </div>
+
+      <div class="banner" id="banner">
+        <b id="bannerHead">어제 미달.</b> 오늘은 거를 수 없는 날. 최소 포지션(<span id="bannerMins">30, 5, 5</span>, 가슴 펴기와 송은 룰 포함)은 무조건 채운다.
+      </div>
+
+      <!-- v2 운동 슬롯: 평일 정상 조건. 카드 목록(#cards) 밖에 둬서 카드 수 단언과 섞이지 않는다 -->
+      <section id="slotBlock" class="card slot-card" aria-label="운동 슬롯" hidden></section>
+      <div id="posLine" class="posline" role="status"></div>
+
+      <div class="cards" id="cards"></div>
+
+      <div class="strip-section">
+        <div class="strip-head">
+          <span class="strip-title">최근 14일</span>
+          <span class="legend">
+            <span><i style="background:var(--red)"></i>정상</span>
+            <span><i style="background:var(--brass)"></i>최소</span>
+            <span><i style="background:var(--blue)"></i>미달</span>
+          </span>
+        </div>
+        <div class="strip" id="strip"></div>
+      </div>
+
+      <div class="rule-note">
+        <b>정상 포지션</b> <span id="goalFullNums">100, 20, 20</span> &nbsp;/&nbsp; <b>최소 포지션</b> <span id="goalMinNums">30, 5, 5</span><br>
+        <b>운동 슬롯 룰</b> 평일은 시간표의 슬롯 하나(아침, 점심, 저녁런닝)를 해야 정상이다. 비우면 그날은 최소 포지션까지만. 주말은 송은 시간이라 슬롯 조건이 없다.<br>
+        <b>송은 룰</b> 짜증이 올라오면 해결 먼저, 감정은 나중. X는 그 자체로 그날 미달이다.<br>
+        <b>가슴 펴기 룰</b> 하루 내내 가슴을 당당히 펴고 있는가. 저녁에 O를 눌러야 그날 통과이고, X나 미응답은 그날 미달이다.<br>
+        <b>투자 원칙 룰</b> 매주 한 번 정독하고 검토한다. 언제든 체크할 수 있고 목요일이나 금요일을 권장한다. 금요일까지 미완료면 그날 미달이다.<br>
+        룰은 하나. <b>두 번 연속 거르지 않는다.</b> 흩뿌려도 된다. 20×5도 100이다.<br>
+        빠뜨린 날은 위의 ‹ › 나 14일 칸으로 돌아가 채운다. 수치만 고쳐지고 판정 기준은 그날 기준 그대로다.
+      </div>
+    </div>
+
+    <!-- ================= 시간표 (v2: 주간 시간표와 일간 시간축) ================= -->
+    <div id="screen-plan" style="display:none">
+      <div class="screen-head">
+        <h2 class="screen-title">시간표</h2>
+        <div class="seg seg-mini" id="planModes" role="group" aria-label="시간표 보기">
+          <button type="button" class="seg-btn" data-mode="day" aria-pressed="false">일간</button>
+          <button type="button" class="seg-btn on" data-mode="week" aria-pressed="true">주간</button>
+        </div>
+      </div>
+
+      <div id="planWeekView">
+        <div class="seg week-seg" id="planWeeks" role="group" aria-label="주 선택"></div>
+        <p class="plan-inherit" id="planInherit" hidden></p>
+        <div class="tt-card"><div class="tt-grid" id="planGrid"></div></div>
+        <div class="tt-legend" aria-hidden="true">
+          <span><i class="lg plan"></i>계획</span><span><i class="lg done"></i>완료</span>
+          <span><i class="lg miss"></i>비었음</span><span><i class="lg ghost"></i>옮김</span>
+        </div>
+        <div class="section-head"><span class="section-title">메모</span><span class="section-note">이 기기에만 저장</span></div>
+        <div class="memo-list" id="planMemos"></div>
+        <div class="plan-foot">
+          <span class="plan-count" id="planCount"></span>
+          <span class="plan-caption">칸을 누르면 그날 계획이 옮겨 간다. 날짜를 누르면 일간 보기. 아침 슬롯의 전제는 전날 23시 취침.</span>
+        </div>
+      </div>
+
+      <div id="planDayView" hidden>
+        <div class="day-head" id="planDayHead"></div>
+        <div class="day-memo" id="planDayMemo"></div>
+        <div class="tl-card"><div class="tl" id="planTimeline"></div></div>
+        <div class="day-status-wrap" id="planDayStatus"></div>
+      </div>
+    </div>
+
+    <!-- ================= 추이 ================= -->
+    <div id="screen-trends" style="display:none">
+      <section id="forgeTrends" class="card forge-card forge-trends" aria-label="27 담금질 장부" hidden></section>
+      <section id="reflectionHistory" class="reflection-history" aria-label="하루 만족도 기록"></section>
+      <div class="cal-section">
+        <div class="strip-head">
+          <span class="strip-title" id="calendarTitle">루틴과 만족도</span>
+          <span class="legend" id="calendarLegend">
+            <span><i style="background:var(--red)"></i>정상</span>
+            <span><i style="background:var(--brass)"></i>최소</span>
+            <span><i style="background:var(--blue)"></i>미달</span>
+            <span>글자 O X 만족도</span>
+          </span>
+        </div>
+        <div class="cal-card">
+          <div class="cal-head">
+            <button class="icon-btn cal-nav" id="calPrev" aria-label="이전 달">‹</button>
+            <span class="cal-label num" id="calLabel"></span>
+            <button class="icon-btn cal-nav" id="calNext" aria-label="다음 달">›</button>
+          </div>
+          <div class="cal-wd" id="calWd"></div>
+          <div class="cal-grid" id="calGrid"></div>
+          <div id="reflectionDay" class="reflection-day" hidden></div>
+        </div>
+      </div>
+
+      <div class="chips" id="routineStreaks">
+        <div class="chip">루틴 현재 스트릭<b id="curStreak">0일</b></div>
+        <div class="chip">루틴 최장 스트릭<b id="maxStreak">0일</b></div>
+      </div>
+
+      <div class="habit-section">
+        <div class="strip-head"><span class="strip-title" id="habitTitle">습관별</span></div>
+        <div class="ledger-wrap">
+          <table class="ledger compact">
+            <thead><tr><th>습관</th><th>정상</th><th>최소</th><th>미달</th><th>누적</th><th>정상률</th></tr></thead>
+            <tbody id="habitBody"></tbody>
+          </table>
+        </div>
+        <div class="wife-line" id="wifeLine"></div>
+        <details class="note-fold">
+          <summary>기준 보기</summary>
+          <div class="table-note">
+          습관별 정상 = 그 습관 목표만 충족한 날 / 장부와 캘린더 색의 정상 = 일간 습관 모두 + 가슴 펴기 O + 송은 X 없음 + 평일 운동 슬롯.
+          운동 = 운동 슬롯, 런닝, 담금질 운동 O 중 하나라도 한 날(시간표 시작일부터). 런닝 = 뛴 날 수와 km.
+          투자 원칙(주) = 금요일까지 정상, 주말 완료 최소, 일요일까지 미완료 미달.
+          진행 중인 주는 제외하며 금요일이 속한 달에 집계한다. 손익비 스냅샷(주)은 2026-11-09 은퇴, 그 전 달에만 남는다.
+          두 기준이 다르므로 회고 인용 시 구분할 것.
+          </div>
+        </details>
+      </div>
+
+      <div class="month-section" id="monthSection" style="display:none">
+        <div class="strip-head"><span class="strip-title">월별 장부</span><span class="legend">확정일 기준, 오늘 제외</span></div>
+        <div class="ledger-wrap scroll-x">
+          <table class="ledger compact month-ledger">
+            <thead><tr><th>월</th><th>정상</th><th>최소</th><th>미달</th><th>정상률</th><th>슬롯</th><th>송은 X</th></tr></thead>
+            <tbody id="monthBody"></tbody>
+          </table>
+        </div>
+        <div class="table-note">슬롯 = 운동 슬롯을 한 평일 / 슬롯 조건이 있던 평일(시간표 시작일부터). 송은 X = 송은 X 일수.</div>
+      </div>
+
+      <details id="archiveFold" class="archive-fold">
+        <summary><span>X 사유 아카이브</span><small>검색, 월별 보기, 내보내기</small></summary>
+        <section id="reflectionArchive" class="reflection-archive" aria-label="X 사유 아카이브"></section>
+      </details>
+    </div>
+
+    <!-- ================= 헬스 (Iron Terminal, 처음 열 때 마운트) ================= -->
+    <div id="screen-iron" style="display:none" aria-label="헬스">
+      <!-- 헬스 탭: 근력(Iron, React) | 런닝(루틴 기록 day.runs). 2026-11-09 -->
+      <div class="health-head">
+        <h1 class="health-title">헬스</h1>
+        <div class="seg-mini health-modes" role="group" aria-label="헬스 종류">
+          <button class="seg-btn" data-health="gym" aria-pressed="true">근력</button>
+          <button class="seg-btn" data-health="run" aria-pressed="false">런닝</button>
+        </div>
+      </div>
+      <div id="ironMount"></div>
+      <div id="runScreen" hidden></div>
+    </div>
+
+    <!-- ================= 설정 ================= -->
+    <div id="screen-settings" style="display:none">
+      <div class="settings-section">
+        <div class="strip-head"><span class="strip-title">알림</span></div>
+        <p class="settings-note">오전 9시부터 밤 9시까지 두 시간마다 오늘 루틴이 아직 미달이면, 밤 11시에 하루 만족도가 미응답이면 알립니다. 홈 화면 앱에서 알림을 켜면 이 기기로 오고, 켜지 않으면 밤 9시와 11시만 메인컨트롤 봇이 대신 알립니다.</p>
+        <p class="settings-note">연결된 기기는 시간표 슬롯과 오늘 포지션(정상, 최소, 미달과 남은 항목)을 메인컨트롤 봇과 주고받습니다. 봇 DM에서 <b>/오늘</b>, <b>/시간표</b>, <b>/슬롯 화 점심</b>. 봇에서 바꾼 계획은 앱을 열 때 들어옵니다. 메모와 만족도 사유는 보내지 않습니다.</p>
+        <p id="pushStatus" class="settings-note" role="status"></p>
+        <p id="reminderSettingsStatus" class="settings-note" role="status"></p>
+        <p id="botSyncStatus" class="settings-note" role="status"></p>
+        <form id="reminderConnectForm" class="reminder-connect">
+          <label for="reminderConnectCode">봇이 보낸 연결 링크 또는 코드</label>
+          <input id="reminderConnectCode" type="password" autocomplete="off" spellcheck="false">
+          <button class="btn" type="submit" id="reminderConnectBtn">이 기기 연결</button>
+        </form>
+        <div class="settings-btns">
+          <button class="btn" id="pushEnableBtn" style="display:none">이 기기 알림 켜기</button>
+          <button class="btn" id="pushDisableBtn" style="display:none">이 기기 알림 끄기</button>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="strip-head">
+          <span class="strip-title">목표치</span>
+          <button class="reset" id="goalRestoreBtn">기본값 복원</button>
+        </div>
+        <div class="goal-card" id="goalRows"></div>
+        <div class="settings-note">
+          목표를 바꾸면 <b>과거 기록의 판정도 새 기준으로 재평가</b>된다. 목표 이력은 관리하지 않는다.
+          스트릭, 정상률, 장부가 모두 다시 계산된다.
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="strip-head"><span class="strip-title">백업</span></div>
+        <div class="settings-btns">
+          <button class="btn" id="exportFileBtn">백업 파일로 내보내기</button>
+          <button class="btn" id="exportBtn">클립보드로 복사</button>
+          <button class="btn" id="importFileBtn">파일에서 가져오기</button>
+          <button class="btn" id="importBtn">붙여넣어 가져오기</button>
+        </div>
+        <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+        <div class="settings-note">
+          가져오기는 <b>합치기</b>다. 같은 날짜는 가져온 기록으로 덮어쓰고 시작일은 더 이른 쪽을 쓴다.
+          v1 내보내기와 routine-v2 프로토타입 JSON도 받는다. 통째로 바꾸려면 기록 초기화 뒤 가져온다.
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="strip-head"><span class="strip-title">데이터</span></div>
+        <div class="settings-btns">
+          <button class="btn danger" id="resetBtn">기록 초기화</button>
+        </div>
+        <div class="settings-btns reset-confirm" id="resetConfirm" hidden>
+          <button class="btn danger" id="resetConfirmBtn">정말 전부 삭제, 되돌릴 수 없음</button>
+          <button class="btn" id="resetCancelBtn">취소</button>
+        </div>
+        <div class="settings-info" id="settingsInfo"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<nav class="tabbar" id="tabbar" style="display:none">
+  <button class="tab active" data-tab="today"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2.1M12 19.1v2.1M2.8 12h2.1M19.1 12h2.1M5.5 5.5 7 7M17 17l1.5 1.5M5.5 18.5 7 17M17 7l1.5-1.5"/></svg><span>오늘</span></button>
+  <button class="tab" data-tab="plan"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="16" rx="3"/><path d="M3.5 9.5h17M9.2 9.5v11M14.8 9.5v11M8 2.8v3.4M16 2.8v3.4"/></svg><span>시간표</span></button>
+  <button class="tab" data-tab="trends"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5h17"/><rect x="5.5" y="11" width="3" height="6.5" rx="1"/><rect x="10.5" y="5.5" width="3" height="12" rx="1"/><rect x="15.5" y="13.5" width="3" height="4" rx="1"/></svg><span>추이</span></button>
+  <button class="tab" data-tab="iron"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="7" width="3.2" height="10" rx="1.2"/><rect x="16.3" y="7" width="3.2" height="10" rx="1.2"/><path d="M7.7 12h8.6M2.5 10v4M21.5 10v4"/></svg><span>헬스</span></button>
+  <button class="tab" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h8.5M17.5 7.5H20M4 16.5h2.5M11.5 16.5H20"/><circle cx="15" cy="7.5" r="2.5"/><circle cx="9" cy="16.5" r="2.5"/></svg><span>설정</span></button>
+</nav>
+
+</body>
+</html>
