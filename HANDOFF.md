@@ -1,3 +1,15 @@
+# 추이와 담금질 UX 정리 7가지 — 2026-11-09 밤
+
+사용자 요청: 제안한 1~7번 전부, 런닝 삭제 확인도.
+
+- 습관 표 320px 한 줄(`.habit-section` nowrap, 좁은 폭 패딩), 담금질 기록과 지우기를 줄 안 `.forge-panel`(prompt, confirm 제거),
+  `#archiveFold` 맨 아래 접기(`archive-jump`가 펼치고 이동), 캘린더 미응답 빈칸, `.note-fold` 기준 보기, 장부 머리 '12.31 마감'과 `.ft-note`,
+  운동 줄 `.forge-link` → `openRun`(헬스 런닝), 런닝 삭제 `.run-confirm`.
+- 검증: 418 tests, typecheck, build, 파이썬 테스트, browser_qa(폰 기본 창 0, 아카이브 펼침, 320 표 한 줄) 통과.
+- 운영 반영: 커밋 d45979b, gh-pages f8ff527 → 4e32cf0, 번들 index-DfVU457C.js 서빙, `--live-smoke` 통과(오류 0).
+
+---
+
 # 추이에 27 담금질 장부 — 2026-11-09 밤
 
 사용자 요청: "27년 담금질도 추이안에 들어가면 좋을 것 같아."
