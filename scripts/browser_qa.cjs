@@ -239,6 +239,9 @@ async function v2Scenario(browser, origin) {
   // 합친 캘린더: 칸 색 = 루틴, 글자 = 만족도. 추이 표에 운동 행
   assert((await page.locator('#calGrid button.combo').count()) > 0);
   assert.equal(await page.locator('#routineStreaks').isVisible(), true);
+  // 27 담금질 장부: 추이 맨 위, 네 항목
+  assert.equal(await page.evaluate(() => document.querySelector('#screen-trends > section').id), 'forgeTrends');
+  assert.equal(await page.locator('#forgeTrends .ft-row').count(), forgeActiveToday() ? 4 : 0);
   assert((await page.locator('#habitBody td:first-child').allInnerTexts()).includes('운동'));
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 }); await noOverflow();

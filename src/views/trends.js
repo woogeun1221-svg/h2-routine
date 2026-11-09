@@ -3,6 +3,7 @@
 import {
   streak, longestStreak, monthList, calMonth, habitMonthStats, monthlyRows, getDay
 } from '../logic.js';
+import { renderForgeTrends } from './forgeTrends.js';
 import { renderReflectionHistory, renderReflectionArchive, showReflectionDay } from './reflection.js';
 
 /* v2부터 월요일 시작(calMonth.lead와 같은 순서). 토일은 황동 라벨. */
@@ -14,6 +15,7 @@ var POSITION = { full: '정상', min: '최소', miss: '미달', pending: '진행
    칸 색 = 루틴 포지션(빨강 정상, 황동 최소, 파랑 미달), 칸 안 글자 = 만족도 O / X / —(미응답).
    칸을 누르면 그날 포지션과 만족도, X 사유가 아래에 나온다. options.mode는 옛 호출 호환용으로 무시한다. */
 export function renderTrends(state, t, ym, options = {}) {
+  renderForgeTrends(state, t);
   renderReflectionHistory(state, ym, t);
   renderReflectionArchive(state, t, options.archiveFilters, options);
   document.getElementById('curStreak').textContent = streak(state, t) + '일';

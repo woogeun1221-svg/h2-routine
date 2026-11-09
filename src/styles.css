@@ -701,6 +701,15 @@ table.ledger.month-ledger th:last-child, table.ledger.month-ledger td:last-child
 .forge-track .ft.future { background: var(--surface2); }
 .forge-track .ft.cur { outline: 1.5px solid var(--text); outline-offset: 1.5px; }
 .forge-track.dense .ft.cur { outline-width: 1px; outline-offset: 1px; }
+.forge-trends .forge-dday small { max-width: 92px; text-align: right; line-height: 1.3; }
+.forge-rate { margin-left: auto; font-size: 15px; font-weight: 800; letter-spacing: -0.02em; color: var(--muted); }
+.forge-rate.hi { color: var(--red); }
+.forge-rate.mid { color: var(--brass); }
+.forge-rate.lo { color: var(--blue); }
+.ft-log { list-style: none; margin: 9px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ft-log li { display: flex; gap: 10px; align-items: baseline; font-size: 13px; line-height: 1.4; }
+.ft-log li span { flex: 0 0 38px; color: var(--faint); font-size: 12px; }
+.ft-log li b { font-weight: 600; min-width: 0; overflow-wrap: anywhere; word-break: keep-all; }
 .slot-off { width: 100%; margin-top: 8px; min-height: 40px; font-size: 13px; font-weight: 600; color: var(--muted); background: none; border: 1px dashed var(--line2); }
 .slot-off.sel-x { border-style: solid; }
 

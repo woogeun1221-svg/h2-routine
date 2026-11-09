@@ -115,3 +115,30 @@ describe('27 담금질 블록 DOM', () => {
     expect(document.getElementById('forgeBlock').hidden).toBe(true);
   });
 });
+
+describe('추이 화면 담금질 장부', () => {
+  beforeEach(() => { document.body.innerHTML = '<section id="forgeTrends" hidden></section>'; });
+  it('항목별 달성률은 끝난 구간 기준, 기록 목록은 최신 먼저, 운동은 출처별', async () => {
+    const { renderForgeTrends, forgeItemSummary } = await import('../src/views/forgeTrends.js');
+    const s = base({
+      '2026-11-10': { bk: '원칙', e: 'am' }, '2026-11-12': { bk: '돈의 심리학' },
+      '2026-11-17': { runs: [{ km: 5 }] }, '2026-11-18': { fx: true }
+    });
+    const bk = forgeItemSummary(s, forgeItem('bk'), '2026-11-18');
+    expect(bk.rate).toBe(100);                      // 1주차 완료, 2주차는 진행 중이라 분모에서 빠진다
+    expect(bk.left).toBe(7);
+    expect(forgeItemSummary(s, forgeItem('stk'), '2026-11-18').rate).toBe(0);   // 1주차 미달
+    renderForgeTrends(s, '2026-11-18');
+    const root = document.getElementById('forgeTrends');
+    expect(root.hidden).toBe(false);
+    expect(root.querySelectorAll('.ft-row').length).toBe(4);
+    expect([...root.querySelectorAll('[data-forge="bk"] .ft-log b')].map(b => b.textContent)).toEqual(['돈의 심리학', '원칙']);
+    expect(root.querySelector('[data-forge="fx"] .ft-counts').textContent).toContain('슬롯 1일, 런닝 1일, 직접 1일');
+    expect(root.querySelector('[data-forge="wr"] .forge-rate').textContent).toBe('—');
+  });
+  it('시작 전엔 숨긴다', async () => {
+    const { renderForgeTrends } = await import('../src/views/forgeTrends.js');
+    renderForgeTrends(base({}), '2026-11-08');
+    expect(document.getElementById('forgeTrends').hidden).toBe(true);
+  });
+});
