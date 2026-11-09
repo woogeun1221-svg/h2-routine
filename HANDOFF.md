@@ -1,3 +1,14 @@
+# 추이에 27 담금질 장부 — 2026-11-09 밤
+
+사용자 요청: "27년 담금질도 추이안에 들어가면 좋을 것 같아."
+
+- `src/views/forgeTrends.js`(`renderForgeTrends`, `forgeItemSummary`), `index.html` `#forgeTrends`(추이 첫 섹션), `renderTrends`가 호출, styles `.forge-rate`, `.ft-log`.
+- 달성률 = 완료 구간 / (완료 + 미달). 진행 중 구간은 완료했을 때만 분모. 시작 전 숨김, 마감 뒤에도 보관용으로 표시. 루틴 판정과 무관.
+- 검증: 417 tests, typecheck, build, browser_qa(추이 첫 섹션과 4줄) 통과. 화면 `/private/tmp/h2-routine-qa/v2-trends-320.png`.
+- 운영 반영: 커밋 41712d5, gh-pages 356c38a → f8ff527, 번들 index-CGQ8r-yS.js 서빙 확인, `--live-smoke` 통과(오류 0).
+
+---
+
 # 운동 안 함, 추이 운동, 캘린더 합치기, 손익비 은퇴, 런닝 — 2026-11-09 저녁
 
 ## 현재 작업
