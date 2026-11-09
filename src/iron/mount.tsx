@@ -10,7 +10,6 @@
 
 import React from "react";
 import { createRoot, type Root } from "react-dom/client";
-import "@fontsource/ibm-plex-mono/400.css";
 import "./ui/styles.css";
 import "./ui/embedded.css";
 import { App } from "./ui/App.js";

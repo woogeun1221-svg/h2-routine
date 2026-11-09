@@ -644,3 +644,51 @@ table.ledger.month-ledger th:last-child, table.ledger.month-ledger td:last-child
   .slot-tag { right: 3px; }
   #screen-iron { margin: 0 -14px; }
 }
+
+/* ---------- 27 담금질 (사이드 프로젝트, 오늘 화면 맨 위) ----------
+   달군 쇠 느낌의 위쪽 띠 하나만 더하고 나머지는 색 규칙 그대로: 완료 빨강, 미달 파랑, 마감일 황동. */
+.forge-card {
+  margin-top: 14px; position: relative; overflow: hidden;
+  background: linear-gradient(180deg, rgba(239,75,66,.07), rgba(239,75,66,0) 90px), var(--surface);
+  border-color: rgba(239,75,66,.28);
+}
+.forge-card::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px;
+  background: linear-gradient(90deg, var(--brass), var(--red) 55%, #FF7A45);
+}
+.forge-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.forge-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.forge-name-main { font-size: 19px; font-weight: 800; letter-spacing: -0.03em; }
+.forge-sub { font-size: 12px; font-weight: 500; color: var(--muted); }
+.forge-dday { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex: 0 0 auto; }
+.forge-dday b { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; color: var(--red); line-height: 1.1; }
+.forge-dday small { font-size: 11px; color: var(--faint); }
+.forge-rows { margin-top: 12px; display: flex; flex-direction: column; }
+.forge-row { padding: 11px 0 12px; border-top: 1px solid var(--line); }
+.forge-row:first-child { border-top: none; padding-top: 4px; }
+.forge-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.forge-main { min-width: 0; flex: 1; }
+.forge-line { display: flex; align-items: baseline; gap: 8px; }
+.forge-name { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+.forge-goal { font-size: 12px; font-weight: 500; color: var(--faint); }
+.forge-score { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--muted); }
+.forge-status {
+  margin-top: 2px; font-size: 13px; line-height: 1.45; color: var(--muted);
+  word-break: keep-all; overflow-wrap: anywhere;
+}
+.forge-row.phase-done .forge-status { color: var(--text); }
+.forge-row.phase-last .forge-status { color: var(--brass); }
+.forge-btn {
+  flex: 0 0 auto; min-width: 76px; min-height: 44px; padding: 0 14px; font-size: 14px;
+}
+.forge-btn:disabled { opacity: 1; }
+.forge-track { display: flex; gap: 4px; margin-top: 9px; }
+.forge-track .ft { flex: 1; height: 6px; border-radius: 3px; background: var(--surface3); }
+.forge-track.dense { gap: 2px; }
+.forge-track.dense .ft { height: 5px; border-radius: 2px; }
+.forge-track .ft.done { background: var(--red); }
+.forge-track .ft.miss { background: var(--blue); opacity: .75; }
+.forge-track .ft.open { background: var(--surface3); box-shadow: inset 0 0 0 1px var(--red-line); }
+.forge-track .ft.future { background: var(--surface2); }
+.forge-track .ft.cur { outline: 1.5px solid var(--text); outline-offset: 1.5px; }
+.forge-track.dense .ft.cur { outline-width: 1px; outline-offset: 1px; }

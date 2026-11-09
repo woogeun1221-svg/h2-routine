@@ -144,14 +144,14 @@ export function DashboardScreen({
             lap={summary.next.lap}
           />
           <div className="dim" style={{ fontSize: 13, marginTop: 8 }}>
-            {summary.next.template.label} ·{" "}
+            {summary.next.template.label},{" "}
             {summary.next.template.exerciseIds.length}종목
           </div>
         </Card>
         <EmptyState
           icon={<TrendingUp size={30} strokeWidth={1.5} />}
           title="첫 기록을 남겨보세요"
-          sub="여기가 당신의 시작 무게입니다. 첫 세션을 기록하면 추세·기록이 쌓입니다."
+          sub="여기가 당신의 시작 무게입니다. 첫 세션을 기록하면 추세와 기록이 쌓입니다."
           action={
             <button
               className="btn primary"
@@ -188,7 +188,7 @@ export function DashboardScreen({
           {summary.next.template.label}
         </div>
         <div className="dim" style={{ fontSize: 12.5, marginBottom: 12 }}>
-          {summary.perExercise.map((p) => p.def.name).join(" · ")}
+          {summary.perExercise.map((p) => p.def.name).join(", ")}
         </div>
         <button
           className="btn primary full"

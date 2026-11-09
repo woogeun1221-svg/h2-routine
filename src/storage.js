@@ -7,8 +7,10 @@
    c는 가슴 펴기(2026-11-03 추가) o/x/null 체크이며 postureStart(처음 연 날)부터 O여야 통과한다.
    self=o/x/null, selfReason은 하루 만족도 선택/이유이며 기존 루틴 판정과 별개다.
    v2(2026-11-08): e는 그날 실제로 한 운동 슬롯(am, noon, run), plans는 월요일 날짜를 키로 한 주간 시간표,
-   exerciseSlotStart는 평일 슬롯이 정상 조건에 들어가는 첫날(처음 연 날). 저장 키는 그대로 두고 필드만 덧붙인다. */
+   exerciseSlotStart는 평일 슬롯이 정상 조건에 들어가는 첫날(처음 연 날). 저장 키는 그대로 두고 필드만 덧붙인다.
+   27 담금질(2026-11-09, src/forge.js): bk, wr, stk는 그날 끝낸 책, 글, 종목 제목(문자열), fx는 그날 운동 O(불리언). 판정과 무관. */
 import { HABITS, WEEKLIES, CHECKS, EXERCISE_SLOT, isSlot, mondayOf } from './logic.js';
+import { FORGE_TEXT_KEYS, FORGE_TITLE_MAX } from './forge.js';
 
 var STORE_KEY = 'h2-routine-v1';
 export var SCHEMA_VERSION = 2;
@@ -70,6 +72,11 @@ export function validateState(obj) {
       if (d[wk] !== undefined && typeof d[wk] !== 'boolean') return k + '.' + wk + ' 값 오류';
     }
     if (d.e !== undefined && d.e !== null && !isSlot(d.e)) return k + '.e 값 오류';
+    for (var fi = 0; fi < FORGE_TEXT_KEYS.length; fi++) {
+      var fv = d[FORGE_TEXT_KEYS[fi]];
+      if (fv !== undefined && fv !== null && (typeof fv !== 'string' || fv.length > FORGE_TITLE_MAX)) return k + '.' + FORGE_TEXT_KEYS[fi] + ' 값 오류';
+    }
+    if (d.fx !== undefined && typeof d.fx !== 'boolean') return k + '.fx 값 오류';
     if (d.self !== undefined && d.self !== null && d.self !== 'o' && d.self !== 'x') return k + '.self 값 오류';
     if (d.selfReason !== undefined && (typeof d.selfReason !== 'string' || d.selfReason.length > 4000)) {
       return k + '.selfReason 값 오류';

@@ -147,6 +147,22 @@ async function v2Scenario(browser, origin) {
   assert.equal(await page.locator('#posLine .pill').innerText(), '최소 포지션');
   assert.equal(await page.locator('#posLine .pos-gap').innerText(), '정상까지 운동 슬롯');
   await page.screenshot({ path: path.join(report, 'v2-today-monday-before-slot-390.png'), fullPage: true });
+  // 27 담금질(2026-11-09): 오늘 화면 맨 위, 기록은 그날 day 필드, 루틴 판정과 별개
+  assert.equal(await page.evaluate(() => document.querySelector('#screen-today > section').id), 'forgeBlock');
+  assert.equal(await page.locator('#forgeBlock .forge-row').count(), 4);
+  assert.equal(await page.locator('#forgeBlock .forge-dday b').innerText(), 'D-52');
+  const posBeforeForge = await page.locator('#posLine .pill').innerText();
+  await page.locator('#forgeBlock [data-forge="stk"] .forge-btn').click();   // prompt는 기본값('')으로 수락 → '완료'
+  assert.equal((await stored()).days['2026-11-09'].stk, '완료');
+  assert.equal(await page.locator('#forgeBlock [data-forge="stk"] .forge-btn').innerText(), '기록됨');
+  assert.equal(await page.locator('#posLine .pill').innerText(), posBeforeForge);
+  await page.locator('#forgeBlock [data-forge="stk"] .forge-btn').click();   // confirm 수락 → 지움
+  assert.equal((await stored()).days['2026-11-09'].stk, undefined);
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 }); await noOverflow();
+    await page.screenshot({ path: path.join(report, 'forge-today-' + width + '.png') });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#slotBlock [data-slot="noon"]').click();
   assert.equal(await page.locator('#posLine .pill').innerText(), '정상 포지션');
   assert.equal(await page.locator('#slotBlock .slot-note').innerText(), '계획대로 완료.');

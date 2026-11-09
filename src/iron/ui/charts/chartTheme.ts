@@ -11,22 +11,22 @@
  */
 
 // ─────────────────────────────────────────────────────────────
-// 색 (styles.css :root 와 동일 값)
+// 색 (2026-11-09부터 루틴 디자인 토큰과 같은 값, embedded.css 참고)
 // ─────────────────────────────────────────────────────────────
 export const CHART_COLORS = {
-  bg1: "#12161f",
-  bg2: "#1b212c",
-  line: "#2a3140",
-  text: "#e6edf3",
-  textDim: "#9aa4b2",
-  textFaint: "#6b7280",
+  bg1: "#141518",
+  bg2: "#1C1E22",
+  line: "#2C2F35",
+  text: "#F2F3F5",
+  textDim: "#A3A7AE",
+  textFaint: "#6B7078",
   /** 상승·신기록·달성 강조 */
-  up: "#f6465d",
-  upSoft: "rgba(246, 70, 93, 0.14)",
+  up: "#EF4B42",
+  upSoft: "rgba(239, 75, 66, 0.15)",
   /** 드문 하락 = 파랑 */
-  down: "#2f81f7",
+  down: "#5B8DEF",
   /** 유지/경고/목표선 = amber */
-  hold: "#d29922",
+  hold: "#D9A441",
   /** 뮤트(최신값이 첫값보다 낮을 때의 라인/필) */
   muted: "#4b5563",
   mutedSoft: "rgba(75, 85, 99, 0.16)",
@@ -38,8 +38,8 @@ export const CHART_COLORS = {
 // 폰트 (숫자 눈금은 모노 · tabular)
 // ─────────────────────────────────────────────────────────────
 export const CHART_FONT = {
-  mono: '"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace',
-  kr: '"IBM Plex Sans KR", -apple-system, "Apple SD Gothic Neo", sans-serif',
+  mono: '-apple-system, "SF Pro Text", "Apple SD Gothic Neo", system-ui, sans-serif',
+  kr: '-apple-system, "SF Pro Text", "Apple SD Gothic Neo", system-ui, sans-serif',
   axisSize: 11,
   labelSize: 11,
 } as const;

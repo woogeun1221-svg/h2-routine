@@ -284,9 +284,9 @@ function ExerciseCard({
       title={def.name}
       accessory={
         <span className="dim">
-          {sets.length}세트 · 목표 {fmtReps(def.targetReps, true)}
+          {sets.length}세트, 목표 {fmtReps(def.targetReps, true)}
           {!bodyweight && base != null && (
-            <> · 제안 <span className="num">{fmtKg(base)}</span>kg</>
+            <>, 제안 <span className="num">{fmtKg(base)}</span>kg</>
           )}
         </span>
       }

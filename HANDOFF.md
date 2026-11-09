@@ -1,3 +1,28 @@
+# 27 담금질 프로젝트, 헬스 탭 디자인 개편 — 2026-11-09
+
+## 현재 작업
+
+사용자 요청: "헬스 쪽은 디자인을 변경 부탁하고, 12월까지의 27년 담금질 프로젝트를 하나 사이드로 시작. 일주일에 독서 한 권, 이주일에 한 번 글쓰기,
+일주일에 한 번 종목 하나 보기, 매일 운동하기. 담금질 프로젝트가 가장 먼저 뜨게. 매일 루틴도 당연히 지켜야."
+
+- 담금질: `src/forge.js`(정의, 구간, 판정), `src/views/forge.js`(블록), `index.html` `#forgeBlock`(`#reflection` 앞, `#cards` 밖), `src/main.js` `setForge`,
+  `src/storage.js` 검증(`bk`, `wr`, `stk` 문자열 200자, `fx` 불리언), `src/styles.css` 끝 `.forge-*`.
+- 결정(사용자 미확인): 기간 2026-11-09~2026-12-31 고정, 루틴 판정과 알림, 봇 요약과 분리, 운동 = `fx` 또는 운동 슬롯 `e`, 제목 입력은 prompt.
+- 헬스 탭: `src/iron/ui/embedded.css` 전면 교체(Iron 토큰을 루틴 토큰 값으로, 시스템 글꼴, 세그먼트형 상체 하체와 화면 메뉴, 세트 행 '달성' 배경 제거, 스테퍼 폭 유연).
+  `Header.tsx` 구조 변경(큰 제목 '헬스' + 설정, 세그먼트, 요약 칩 '🔥 n주', '다음 상체 n바퀴째'). Plex Mono import 제거(`main.js`, `mount.tsx`, 의존성은 남김). 차트 색과 글꼴 `charts/chartTheme.ts`도 새 토큰 값으로.
+  Iron 화면 문구 가운뎃점을 쉼표로(프리셋 라벨 `presets.ts`는 저장 데이터와 엮여 그대로).
+
+## 검증
+
+- `npm test` 36 files / 402 tests(`test/forge.test.js` 13 추가), `npm run typecheck`, `npm run build` 통과.
+- `node scripts/browser_qa.cjs` 통과, 브라우저 오류 0. v2 시나리오에 담금질(맨 위 섹션, 4줄, D-52, 종목 기록과 지움, 포지션 불변, 320/390 넘침 0) 추가. 화면 `/private/tmp/h2-routine-qa/forge-today-*.png`, `iron-*.png`.
+
+## 남은 일
+
+- 커밋과 `npm run deploy`는 사용자 OK 뒤. 서버와 launchd 변경 없음.
+
+---
+
 # 시간표 다시 설계, 디자인 개편, 메인컨트롤 봇 동기화 — 2026-11-08 오후
 
 ## 현재 작업

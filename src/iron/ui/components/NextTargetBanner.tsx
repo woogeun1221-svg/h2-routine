@@ -3,7 +3,7 @@
  *
  * WeightSuggestion(도메인 progression.ts 결과)를 카피로 번역한다:
  *  - isBump(전 세트 12회 달성): solid up-red "전 세트 12회 달성 · 다음 +Xkg 적용 ▲"
- *  - hold(12회 미달):           amber      "12회 미달 · 같은 무게 유지"
+ *  - hold(12회 미달):           amber      "12회 미달, 같은 무게 유지"
  *  - bodyweight/first 등:       neutral    중립 안내
  * .next-banner / .next-banner.{bump,hold,neutral} 토큰 사용.
  */
@@ -40,11 +40,11 @@ export function NextTargetBanner({
 
   if (tone === "bump") {
     icon = <TrendingUp size={18} strokeWidth={2.5} />;
-    title = `전 세트 12회 달성 · 다음 세션 +${inc}kg 적용 ▲`;
+    title = `전 세트 12회 달성, 다음 세션 +${inc}kg 적용 ▲`;
     sub = `다음 세션 ${fmtKg(suggestion.suggestedKg)}kg 로 증량`;
   } else if (tone === "hold") {
     icon = <Minus size={18} strokeWidth={2.5} />;
-    title = "12회 미달 · 같은 무게 유지";
+    title = "12회 미달, 같은 무게 유지";
     sub =
       suggestion.suggestedKg != null
         ? `현재 무게 ${fmtKg(suggestion.suggestedKg)}kg 유지`

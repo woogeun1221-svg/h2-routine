@@ -265,7 +265,7 @@ export function CalendarScreen({
             if (cell.iso === today) classes.push("today");
             const title =
               count > 0
-                ? `${cell.iso} · ${count}세션`
+                ? `${cell.iso}, ${count}세션`
                 : cell.iso;
             return (
               <div

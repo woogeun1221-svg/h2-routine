@@ -63,7 +63,7 @@ function StreakInline({ streak }: { streak: WeeklyStreak }): React.ReactElement 
       <span className="streak-flame" aria-hidden>
         🔥
       </span>
-      <span className="streak-count">{streak.current}</span>
+      <span className="streak-count">{streak.current}주</span>
       <span className="streak-dots" aria-hidden>
         {dots.map((on, i) => (
           <span
@@ -92,37 +92,39 @@ export function Header({
 
   return (
     <header className="header">
-      <div className="header-row">
-        <ProgramTabs
-          programs={programs}
-          active={program}
-          onSelect={onSelectProgram}
-        />
+      <div className="header-row iron-head-row">
+        <h2 className="iron-title">헬스</h2>
         <div className="row">
           {!online && (
             <span className="offline-badge" role="status">
               오프라인
             </span>
           )}
-          <StreakInline streak={streak} />
-          {day != null && (
-            <span className="day-chip">
-              {day.shortLabel}
-              <span className="day-lap">·{day.lap}</span>
-            </span>
-          )}
           {onOpenSettings != null && (
             <button
               type="button"
-              className="btn ghost"
+              className="btn ghost iron-icon-btn"
               aria-label="설정"
               onClick={onOpenSettings}
-              style={{ minHeight: 36, minWidth: 36, padding: 6 }}
             >
-              <Settings size={18} aria-hidden />
+              <Settings size={20} aria-hidden />
             </button>
           )}
         </div>
+      </div>
+      <ProgramTabs
+        programs={programs}
+        active={program}
+        onSelect={onSelectProgram}
+      />
+      <div className="iron-meta">
+        <StreakInline streak={streak} />
+        {day != null && (
+          <span className="day-chip">
+            다음 {day.shortLabel}
+            <span className="day-lap">{day.lap + 1}바퀴째</span>
+          </span>
+        )}
       </div>
     </header>
   );

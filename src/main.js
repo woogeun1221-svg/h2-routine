@@ -1,7 +1,4 @@
-/* 루틴 화면은 시스템 글꼴(iOS SF, Apple SD 산돌고딕 Neo)을 쓴다(2026-11-08 개편). Plex Mono 굵기는 헬스 탭이 쓴다. */
-import '@fontsource/ibm-plex-mono/500.css';
-import '@fontsource/ibm-plex-mono/600.css';
-import '@fontsource/ibm-plex-mono/700.css';
+/* 루틴 화면과 헬스 탭 모두 시스템 글꼴(iOS SF, Apple SD 산돌고딕 Neo)을 쓴다(2026-11-08 루틴, 2026-11-09 헬스 개편). */
 import './styles.css';
 import { registerSW } from 'virtual:pwa-register';
 import {
@@ -196,6 +193,13 @@ function toggleCheck(key, v) {
   save(); render();
 }
 /* 운동 슬롯(e) — 실제로 한 슬롯을 누르면 완료, 같은 슬롯을 다시 누르면 취소. 계획과 달라도 그대로 기록한다. */
+/* 27 담금질 기록 — 보는 날에 쓴다. 글 항목은 제목 문자열, 운동은 true. null이면 지운다. 판정과 무관하다. */
+function setForge(key, value) {
+  var d = ensureDay(targetDay());
+  if (value === null || value === undefined || value === false) delete d[key];
+  else d[key] = value;
+  save(); render();
+}
 function toggleSlot(slot) {
   if (!isSlot(slot)) return;
   var t = targetDay();
@@ -326,7 +330,7 @@ function switchTab(tab) {
 
 function todayHandlers() {
   return {
-    addVal: addVal, undoVal: undoVal, setDirect: setDirect, toggleW: toggleW, toggleCheck: toggleCheck,
+    addVal: addVal, undoVal: undoVal, setDirect: setDirect, toggleW: toggleW, toggleCheck: toggleCheck, setForge: setForge,
     setReflection: setReflection, setReflectionReason: setReflectionReason,
     toggleWeekly: toggleWeekly, toggleSlot: toggleSlot, selectDay: selectDay, undoStack: undoStack
   };

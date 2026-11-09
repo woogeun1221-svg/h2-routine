@@ -276,7 +276,7 @@ export function SettingsScreen({
 
       {/* ── 백업 · 이전 ── */}
       <Card
-        title="백업 · 기기 이전"
+        title="백업, 기기 이전"
         accessory={<span className="dim">JSON</span>}
       >
         <p className="dim" style={{ fontSize: 13, marginBottom: 12 }}>
@@ -372,7 +372,7 @@ export function SettingsScreen({
                 <div className="col" style={{ gap: 2 }}>
                   <span style={{ fontWeight: 700 }}>{def.name}</span>
                   <span className="dim" style={{ fontSize: 12 }}>
-                    {def.role === "main" ? "메인" : "보조"} · +
+                    {def.role === "main" ? "메인" : "보조"}, +
                     {fmtKg(def.progressionIncrementKg)}kg 증량
                   </span>
                 </div>
@@ -462,7 +462,7 @@ export function SettingsScreen({
       {/* ── 위험 구역: 초기화 ── */}
       <Card title="데이터 초기화" accessory={<span className="up">위험</span>}>
         <p className="dim" style={{ fontSize: 13, marginBottom: 12 }}>
-          모든 세션·기록·무게 상태를 지우고 초기 상태로 되돌립니다. 되돌릴 수
+          모든 세션, 기록, 무게 상태를 지우고 초기 상태로 되돌립니다. 되돌릴 수
           없으니 먼저 내보내기로 백업하세요.
         </p>
         {!confirmReset ? (

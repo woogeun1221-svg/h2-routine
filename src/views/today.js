@@ -10,12 +10,14 @@ import {
   plannedSlot, slotGuidance, gapsOf, dayRecorded, seoulHour, seoulMinute
 } from '../logic.js';
 import { renderReflection } from './reflection.js';
+import { renderForge } from './forge.js';
 
 var POSITION = { full: '정상', min: '최소', miss: '미달' };
 
 export function renderToday(state, t, h, day) {
   day = day || t;
   var isToday = day === t;
+  renderForge(state, t, h, day);
   renderReflection(state, day, h, isToday);
   var p = day.split('-');
   document.getElementById('dateStr').textContent = p[0] + '.' + p[1] + '.' + p[2] + ' ' + weekday(day);

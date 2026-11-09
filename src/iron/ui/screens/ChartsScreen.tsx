@@ -225,7 +225,7 @@ function ExerciseCharts({
         targetKg={isWeighted ? targetKg : null}
       />
       <VolumeChart
-        title={`${def.name} · 총 볼륨`}
+        title={`${def.name} 총 볼륨`}
         caption={
           isWeighted
             ? "총 볼륨(무게×횟수×세트)"
@@ -236,10 +236,10 @@ function ExerciseCharts({
       />
       {showOneRM ? (
         <OneRMChart
-          title={`${def.name} · e1RM`}
+          title={`${def.name} e1RM`}
           caption={
             best != null
-              ? `추정 1RM(e1RM) · 최고 ${best.toFixed(1)}kg`
+              ? `추정 1RM, 최고 ${best.toFixed(1)}kg`
               : "추정 1RM(e1RM)"
           }
           kind={def.kind}
