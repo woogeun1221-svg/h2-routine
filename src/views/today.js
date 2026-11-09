@@ -109,9 +109,17 @@ export function renderSlot(state, t, h, day) {
     seg.appendChild(b);
   });
 
+  /* 오늘 운동 안 함(e='off') — 비워 둔 것과 구별해 명시한다. 슬롯 버튼 셋([data-slot])과 따로 둔다 */
+  var off = getDay(state, day).e === 'off';
+  var offBtn = document.createElement('button'); offBtn.type = 'button';
+  offBtn.className = 'btn slot-off' + (off ? ' sel-x' : '');
+  offBtn.setAttribute('aria-pressed', String(off));
+  offBtn.textContent = off ? '운동 안 함으로 기록됨' : (isToday ? '오늘 운동 안 함' : '그날 운동 안 함');
+  offBtn.addEventListener('click', function () { if (h && h.toggleSlot) h.toggleSlot('off'); });
+
   var note = document.createElement('p'); note.className = 'slot-note';
   note.textContent = guide.text;
-  root.append(top, bar, seg, note);
+  root.append(top, bar, seg, offBtn, note);
 }
 
 /* 하루 막대 — 06~24시 위에 슬롯 창 세 개, 23시 취침, 오늘이면 지금 위치. 보기 전용(기록은 아래 버튼).
@@ -278,7 +286,12 @@ function renderCards(state, t, h) {
     wrap.appendChild(cc);
   });
 
-  WEEKLIES.forEach(function (item) { renderWeeklyCard(state, t, h, wrap, item); });
+  WEEKLIES.forEach(function (item) {
+    /* 은퇴한 주간 항목(손익비 스냅샷, 2026-11-09)은 종료일부터 카드를 숨긴다. 그 전 날짜엔 남는다 */
+    var until = item.endKey ? state[item.endKey] : null;
+    if (typeof until === 'string' && t >= until) return;
+    renderWeeklyCard(state, t, h, wrap, item);
+  });
 }
 
 /* 주간 카드 — 투자 원칙, 손익비 스냅샷. 문구는 item(action, upcoming, open)에서, 나머지 단계 문구는 공통. */

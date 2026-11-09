@@ -52,6 +52,7 @@ const v1Sample = { startDate: '2026-06-01', days: {
   '2026-06-01': { p: 100, s: 100, r: 20, w: 'o' }, '2026-06-02': { p: 30, s: 30, r: 5, w: null }, '2026-06-03': { p: 0, s: 0, r: 0, w: 'x' }
 } };
 const kst = iso => new Date(iso + '+09:00');
+const forgeActiveToday = () => date >= '2026-11-09' && date <= '2026-12-31';
 function isoWeekOf(ds) { // ISO 8601: 그 주 목요일이 속한 해의 몇 번째 주
   const d = new Date(ds + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
   return Math.ceil(((d - Date.UTC(d.getUTCFullYear(), 0, 1)) / 864e5 + 1) / 7);
@@ -84,7 +85,8 @@ async function v2Scenario(browser, origin) {
   assert.equal(await page.locator('#weekNo').innerText(), 'W45');
   assert.equal(await page.locator('#slotBlock').isVisible(), true);
   assert.equal(await page.locator('#slotBlock .card-sub').innerText(), '주말, 송은 시간');
-  assert.equal(await page.locator('#cards .card').count(), 7);
+  assert.equal(await page.locator('#cards .card').count(), 6); // 손익비 스냅샷은 2026-11-09 은퇴(처음 연 날부터 카드 없음)
+  assert.equal(await page.locator('[data-weekly="rr"]').count(), 0);
   await page.locator('[data-tab="plan"]').click();
   assert.equal(await page.locator('#planWeeks [aria-pressed="true"]').innerText(), '다음 주\nW46 11.9–11.15');
   assert.equal(await page.locator('#planGrid .tt-day').first().getAttribute('data-day'), '2026-11-09');
@@ -189,6 +191,12 @@ async function v2Scenario(browser, origin) {
   await page.clock.setFixedTime(kst('2026-11-09T21:05:00'));
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   assert.equal(await page.locator('#slotBlock .slot-note').innerText(), '오늘 슬롯 비었음. 최소 포지션(푸쉬업, 턱걸이)으로 마감.');
+  await page.locator('#slotBlock .slot-off').click();   // 운동 안 함(e='off') — 비운 것과 구별, 판정은 같다
+  assert.equal((await stored()).days['2026-11-09'].e, 'off');
+  assert.equal(await page.locator('#slotBlock .slot-note').innerText(), '운동 안 함으로 기록. 오늘은 최소 포지션까지만 찍힌다.');
+  assert.equal(await page.locator('#slotBlock .slot-off').getAttribute('aria-pressed'), 'true');
+  await page.locator('#slotBlock .slot-off').click();
+  assert.equal((await stored()).days['2026-11-09'].e, null);
   await page.locator('#slotBlock [data-slot="run"]').click();
 
   // C. 토요일 12시: 습관 정상이면 슬롯 없이 정상. 시간표는 다음 주(W47)로 열리고 W46 계획을 물려받는다 (완료 조건 1, 2)
@@ -228,7 +236,10 @@ async function v2Scenario(browser, origin) {
   assert.equal(await page.locator('.month-ledger').evaluate(t => t.parentElement.scrollWidth <= t.parentElement.clientWidth), true);
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal((await page.locator('#calWd').innerText()).replace(/\s/g, ''), '월화수목금토일');
-  await page.locator('[data-calendar-mode="routine"]').click();
+  // 합친 캘린더: 칸 색 = 루틴, 글자 = 만족도. 추이 표에 운동 행
+  assert((await page.locator('#calGrid button.combo').count()) > 0);
+  assert.equal(await page.locator('#routineStreaks').isVisible(), true);
+  assert((await page.locator('#habitBody td:first-child').allInnerTexts()).includes('운동'));
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 }); await noOverflow();
     await page.screenshot({ path: path.join(report, 'v2-trends-' + width + '.png'), fullPage: true });
@@ -335,9 +346,10 @@ async function botSyncScenario(browser, origin) {
         '스스로에게 만족할만한 하루를 보냈는가?');
       assert.equal(await page.locator('#reflection .reflection-motto').textContent(), '컨트롤 할 수 있는 건 오로지 나뿐');
       assert.equal(await page.locator('#reflection .reflection-choices button').count(), 2);
-      assert.equal(await page.locator('#cards .card').count(), 7); // 일간 3(스쿼트 은퇴) + 송은 + 가슴 펴기 + 투자 원칙 + 손익비 스냅샷
+      assert.equal(await page.locator('#cards .card').count(), 6); // 일간 3(스쿼트 은퇴) + 송은 + 가슴 펴기 + 투자 원칙(손익비 스냅샷 2026-11-09 은퇴)
       assert((await page.locator('[data-check="c"] .card-name').innerText()).includes('가슴 펴기'));
-      assert((await page.locator('[data-weekly="rr"]').innerText()).includes('손익비 스냅샷'));
+      assert.equal(await page.locator('[data-weekly="rr"]').count(), 0);
+      assert.equal(await page.locator('#forgeBlock .forge-row').count(), forgeActiveToday() ? 4 : 0);
       assert.equal(await page.locator('#cards .card .btn').first().textContent(), '+5');
       assert.equal(await page.locator('#dayPrev').isVisible(), true);
       // v2: 운동 슬롯 블록(#cards 밖), ISO 주차, 시간표 탭(토일엔 다음 주)
@@ -352,12 +364,13 @@ async function botSyncScenario(browser, origin) {
       await page.screenshot({ path: path.join(report, 'production-plan-390.png'), fullPage: true });
       await page.locator('[data-tab="trends"]').click();
       assert.equal(await page.locator('#reflectionHistory .reflection-stats').count(), 1);
-      assert.equal(await page.locator('[data-calendar-mode="self"]').getAttribute('aria-pressed'), 'true');
+      assert((await page.locator('#calGrid button.combo').count()) > 0);
       assert.equal(await page.locator('#archiveSearch').count(), 1);
       assert.equal(await page.locator('.archive-export').textContent(), '전체 아카이브 내보내기');
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       await page.locator('[data-tab="iron"]').click();
-      await page.locator('#screen-iron.iron-root .iron-top .header').waitFor({ timeout: 15000 });
+      await page.locator('#screen-iron .iron-root .iron-top .header').waitFor({ timeout: 15000 });
+      assert.equal(await page.locator('#screen-iron [data-health]').count(), 2);
       assert.equal(await page.locator('#screen-iron .iron-subnav .iron-subnav-item').count(), 5);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       await page.screenshot({ path: path.join(report, 'production-iron-390.png'), fullPage: true });
@@ -477,10 +490,8 @@ async function botSyncScenario(browser, origin) {
     assert(archiveText.includes('현재 O, 보관된 X 사유'));
     await page.locator('#archiveMonth').selectOption('all');
     await page.locator('#calNext').click();
-    await page.locator('[data-calendar-mode="routine"]').click();
-    assert.equal(await page.locator('#routineStreaks').isVisible(), true);
-    await page.locator('[data-calendar-mode="self"]').click();
-    assert.equal(await page.locator('#routineStreaks').isVisible(), false);
+    assert.equal(await page.locator('#routineStreaks').isVisible(), true);   // 캘린더 전환 없음(2026-11-09 합침)
+    assert.equal(await page.locator('[data-calendar-mode]').count(), 0);
 
     await page.locator('[data-tab="settings"]').click();
     // 연결 전 + 푸시 지원 → 버튼 하나로 권한 요청, 구독, 연결(구독 동봉)까지. 켜짐 상태와 끄기까지 확인.
@@ -526,7 +537,8 @@ async function botSyncScenario(browser, origin) {
     // 루틴 화면의 버튼 스타일은 Iron CSS 에 오염되지 않아야 한다.
     const routineTabFont = await page.locator('.tabbar .tab').first().evaluate(el => getComputedStyle(el).fontFamily);
     await page.locator('[data-tab="iron"]').click();
-    await page.locator('#screen-iron.iron-root .iron-top .header').waitFor();
+    if (await page.locator('[data-health="gym"]').getAttribute('aria-pressed') !== 'true') await page.locator('[data-health="gym"]').click();
+    await page.locator('#screen-iron .iron-root .iron-top .header').waitFor();
     assert.equal(await page.locator('#screen-iron .iron-subnav .iron-subnav-item').count(), 5);
     assert.equal(await page.locator('#screen-iron .bottomnav').count(), 0);
     assert((await page.locator('#screen-iron .header').innerText()).includes('상체'));
@@ -552,9 +564,31 @@ async function botSyncScenario(browser, origin) {
       await page.screenshot({ path: path.join(report, 'iron-' + width + '.png'), fullPage: true });
     }
     await page.setViewportSize({ width: 390, height: 844 });
+    // 런닝(2026-11-09): 헬스 탭 안 근력 | 런닝 전환. 기록은 루틴 기록 day.runs, 목록과 주간 막대, 삭제
+    await page.locator('[data-health="run"]').click();
+    assert.equal(await page.locator('#ironMount').isVisible(), false);
+    await page.locator('#runKm').fill('5.2');
+    await page.locator('#runMin').fill('28:36');
+    assert.equal(await page.locator('#runPace').innerText(), "페이스 5'30\" /km");
+    await page.locator('#runAdd').click();
+    let runStored = await page.evaluate(() => JSON.parse(localStorage.getItem('h2-routine-v1')));
+    assert.deepEqual(runStored.days[date].runs, [{ km: 5.2, min: 28.6 }]);
+    assert.equal(await page.locator('#runList li').count(), 1);
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await page.screenshot({ path: path.join(report, 'run-' + width + '.png'), fullPage: true });
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#runList .run-x').click();
+    runStored = await page.evaluate(() => JSON.parse(localStorage.getItem('h2-routine-v1')));
+    assert.equal(runStored.days[date].runs, undefined);
+    await page.locator('[data-health="gym"]').click();
+    assert.equal(await page.locator('#ironMount').isVisible(), true);
     await page.locator('[data-tab="today"]').click();
     assert.equal(await page.locator('#screen-iron').isVisible(), false);
-    assert.equal(await page.locator('#cards .card').count(), 7); // 일간 3(푸쉬업, 턱걸이, 독서) + 송은 + 가슴 펴기 + 투자 원칙 + 손익비 스냅샷
+    assert.equal(await page.locator('#cards .card').count(), 6); // 일간 3(푸쉬업, 턱걸이, 독서) + 송은 + 가슴 펴기 + 투자 원칙(손익비 스냅샷 은퇴)
     assert((await page.locator('#cards .card').nth(1).innerText()).includes('턱걸이'));
     // 가슴 펴기(2026-11-03 추가): 송은 다음 카드. O를 누르면 c='o' 저장과 O 플래그, 다시 누르면 미응답으로. 활성일(오늘) 전인 어제엔 카드가 없다.
     const postureCard = page.locator('[data-check="c"]');
@@ -570,20 +604,10 @@ async function botSyncScenario(browser, origin) {
     postureStored = await page.evaluate(() => JSON.parse(localStorage.getItem('h2-routine-v1')));
     assert.equal(postureStored.days[date].c, null);
     assert.equal(await postureCard.locator('.done-flag').count(), 0);
-    // 손익비 스냅샷: 투자 원칙과 독립 토글, rr=true 로 저장, 취소하면 지워진다. 링크는 새 탭.
-    const rrCard = page.locator('[data-weekly="rr"]');
-    assert.equal(await rrCard.locator('.weekly-link').getAttribute('target'), '_blank');
-    assert.equal(await page.locator('[data-weekly="i"] .weekly-btn').getAttribute('aria-pressed'), 'false');
-    await rrCard.locator('.weekly-btn').click();
-    assert.equal(await rrCard.locator('.done-flag').innerText(), '주간 완료');
-    assert.equal(await page.locator('[data-weekly="i"] .weekly-btn').getAttribute('aria-pressed'), 'false');
-    let rrStored = await page.evaluate(() => JSON.parse(localStorage.getItem('h2-routine-v1')));
-    assert.equal(rrStored.days[date].rr, true);
-    assert.equal(rrStored.days[date].i, undefined);
-    assert.equal(rrStored.rrSnapshotStart, date);
-    await rrCard.locator('.weekly-btn').click();
-    rrStored = await page.evaluate(() => JSON.parse(localStorage.getItem('h2-routine-v1')));
-    assert.equal(rrStored.days[date].rr, undefined);
+    // 손익비 스냅샷은 2026-11-09 은퇴: 처음 연 날이 종료일, 카드 없음
+    const rrStored = await page.evaluate(() => JSON.parse(localStorage.getItem('h2-routine-v1')));
+    assert.equal(rrStored.rrSnapshotEnd, date);
+    assert.equal(await page.locator('[data-weekly="rr"]').count(), 0);
     assert.equal((await page.locator('#cards .card').nth(0).innerText()).includes('스쿼트'), false);
     assert.deepEqual(await page.locator('#cards .card').nth(0).locator('.btn:not(.undo)').allInnerTexts(), ['+5', '+10', '+25']);
     assert.equal(await page.locator('#reflection .reflection-motto').textContent(), '컨트롤 할 수 있는 건 오로지 나뿐');
@@ -647,7 +671,7 @@ async function botSyncScenario(browser, origin) {
     const botSync = await botSyncScenario(browser, 'http://127.0.0.1:' + server.address().port);
     console.log(JSON.stringify({ passed: true, widths: [390, 320, 1200], browserErrors: errors.length,
       legacyRecordsPreserved: true, reasonReloaded: true, crossMonthArchiveAndDownloads: true, ironTabMounted: true,
-      pastDayEdit: true, squatRetired: true, rrSnapshotWeekly: true, pushSubscribeFlow: true, apiMocked: true, ...v2, ...botSync,
+      pastDayEdit: true, squatRetired: true, rrSnapshotRetired: true, runLog: true, pushSubscribeFlow: true, apiMocked: true, ...v2, ...botSync,
       screenshots: report }));
   } finally {
     await browser.close();

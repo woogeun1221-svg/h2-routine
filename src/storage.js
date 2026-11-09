@@ -24,6 +24,7 @@ var START_KEYS = WEEKLIES.map(function (w) { return w.startKey; }).concat(
   HABITS.filter(function (h) { return h.startKey; }).map(function (h) { return h.startKey; }),
   HABITS.filter(function (h) { return h.endKey; }).map(function (h) { return h.endKey; }),
   CHECKS.map(function (c) { return c.startKey; }),
+  WEEKLIES.filter(function (w) { return w.endKey; }).map(function (w) { return w.endKey; }),
   [EXERCISE_SLOT.startKey]);
 
 export function freshState(today) {
@@ -71,12 +72,13 @@ export function validateState(obj) {
       var wk = WEEKLY_KEYS[wi];
       if (d[wk] !== undefined && typeof d[wk] !== 'boolean') return k + '.' + wk + ' 값 오류';
     }
-    if (d.e !== undefined && d.e !== null && !isSlot(d.e)) return k + '.e 값 오류';
+    if (d.e !== undefined && d.e !== null && !isSlot(d.e) && d.e !== 'off') return k + '.e 값 오류'; // off = 운동 안 함(2026-11-09)
     for (var fi = 0; fi < FORGE_TEXT_KEYS.length; fi++) {
       var fv = d[FORGE_TEXT_KEYS[fi]];
       if (fv !== undefined && fv !== null && (typeof fv !== 'string' || fv.length > FORGE_TITLE_MAX)) return k + '.' + FORGE_TEXT_KEYS[fi] + ' 값 오류';
     }
     if (d.fx !== undefined && typeof d.fx !== 'boolean') return k + '.fx 값 오류';
+    if (d.runs !== undefined) { var re = validateRuns(d.runs); if (re) return k + '.runs ' + re; }
     if (d.self !== undefined && d.self !== null && d.self !== 'o' && d.self !== 'x') return k + '.self 값 오류';
     if (d.selfReason !== undefined && (typeof d.selfReason !== 'string' || d.selfReason.length > 4000)) {
       return k + '.selfReason 값 오류';
@@ -89,6 +91,18 @@ export function validateState(obj) {
   if (obj.settings !== undefined) {
     var e = validateSettings(obj.settings);
     if (e) return e;
+  }
+  return null;
+}
+
+/* runs: [{ km: 0 초과 200 이하, min?: 0 이상 1440 이하 }], 하루 10개까지(헬스 탭 런닝, 2026-11-09). */
+function validateRuns(runs) {
+  if (!Array.isArray(runs) || runs.length > 10) return '형식 오류';
+  for (var i = 0; i < runs.length; i++) {
+    var r = runs[i];
+    if (!r || typeof r !== 'object' || Array.isArray(r)) return '형식 오류';
+    if (typeof r.km !== 'number' || !isFinite(r.km) || r.km <= 0 || r.km > 200) return 'km 값 오류';
+    if (r.min !== undefined && (typeof r.min !== 'number' || !isFinite(r.min) || r.min < 0 || r.min > 1440)) return 'min 값 오류';
   }
   return null;
 }

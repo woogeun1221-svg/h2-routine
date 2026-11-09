@@ -21,7 +21,7 @@ describe('load — 손상 데이터 처리', () => {
     const loaded = load('2026-07-23');
     expect(loaded).toEqual({
       ...state, v: 2, investmentReviewStart: '2026-07-23', rrSnapshotStart: '2026-07-23', pullupStart: '2026-07-23',
-      squatEnd: '2026-07-23', postureStart: '2026-07-23', exerciseSlotStart: '2026-07-23'
+      squatEnd: '2026-07-23', postureStart: '2026-07-23', exerciseSlotStart: '2026-07-23', rrSnapshotEnd: '2026-07-23'
     });
     expect(loaded.days).toEqual(state.days);
     expect(mem.has(KEY + '.bak')).toBe(false);
@@ -55,7 +55,7 @@ describe('load — 손상 데이터 처리', () => {
   it('save 후 load 라운드트립 (v2 필드 포함)', () => {
     const state = {
       v: 2, startDate: '2026-07-01', investmentReviewStart: '2026-07-20', rrSnapshotStart: '2026-07-20', pullupStart: '2026-07-21', squatEnd: '2026-07-22',
-      postureStart: '2026-07-22', exerciseSlotStart: '2026-07-22',
+      postureStart: '2026-07-22', exerciseSlotStart: '2026-07-22', rrSnapshotEnd: '2026-07-22',
       days: { '2026-07-22': { p: 30, s: 30, t: 5, r: 5, w: null, c: 'o', i: true, rr: true, e: 'noon' } },
       plans: { '2026-07-20': { 1: 'am', 2: 'noon', 3: 'run', 4: 'am', 5: 'am', m2: '송은 야근' } }
     };

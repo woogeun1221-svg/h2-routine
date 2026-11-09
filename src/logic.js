@@ -50,7 +50,8 @@ export const INVESTMENT_REVIEW = {
 export const RR_SNAPSHOT = {
   key: 'rr', name: '손익비 스냅샷', sub: '매주 1회, 금요일까지', startKey: 'rrSnapshotStart',
   action: '스냅샷 완료', upcoming: '금요일 장 마감 뒤 권장, 지금 미리 완료할 수 있음', open: '권장일, 오늘 또는 내일',
-  statName: '손익비 스냅샷(주)', link: 'https://macmini.taile484c7.ts.net/rr/', gap: '손익비 스냅샷'
+  statName: '손익비 스냅샷(주)', link: 'https://macmini.taile484c7.ts.net/rr/', gap: '손익비 스냅샷',
+  endKey: 'rrSnapshotEnd' // 2026-11-09 은퇴: 처음 연 날부터 그 주 금요일 판정에서 빠진다. 정의는 옛 기록 rr 검증용으로 남긴다
 };
 export const WEEKLIES = [INVESTMENT_REVIEW, RR_SNAPSHOT];
 
@@ -64,6 +65,8 @@ export const SLOT_ORDER = ['am', 'noon', 'run'];
 export const SLOT_CUTOFF = { am: 10, noon: 14, run: 21 };
 export const EXERCISE_SLOT = { key: 'e', name: '운동 슬롯', startKey: 'exerciseSlotStart' };
 export function isSlot(v) { return SLOT_ORDER.indexOf(v) >= 0; }
+/* day.e = 'off'는 '오늘 운동 안 함'을 명시한 기록(2026-11-09). 슬롯이 아니므로 판정은 빈 슬롯과 같다(평일 정상 불가). */
+export const SLOT_OFF = 'off';
 /* 시간표에 그리는 슬롯 창(한국 시간, 시). 끝은 컷오프와 같고 시작은 그 슬롯을 시작할 수 있는 때다.
    하루 축은 DAY_START~DAY_END시, BEDTIME은 아침 슬롯의 전제인 취침 시각이다. 판정에는 쓰지 않는다. */
 export const SLOT_WINDOW = { am: [6, 10], noon: [12, 14], run: [18, 21] };
@@ -202,6 +205,12 @@ export function weeklyStatus(state, ds, item) {
     return { active: false, done: false, phase: 'inactive', reviewedOn: null, ...win };
   }
 
+  /* 은퇴(endKey): 금요일이 종료일 이후인 주는 판정하지 않는다. 그 전 주는 그대로라 소급 변경이 없다. */
+  var until = item.endKey ? state[item.endKey] : null;
+  if (typeof until === 'string' && win.friday >= until) {
+    return { active: false, done: false, phase: 'inactive', reviewedOn: null, ...win };
+  }
+
   var reviewedOn = null, cur = win.monday > start ? win.monday : start;
   var to = ds < win.sunday ? ds : win.sunday;
   while (cur <= to) {
@@ -221,6 +230,21 @@ export function investmentReviewStatus(state, ds) { return weeklyStatus(state, d
 
 /* ---------- status logic ---------- */
 export function getDay(state, ds) { return state.days[ds] || { p: 0, s: 0, t: 0, r: 0, w: null, i: false }; }
+
+/* 런닝 기록(헬스 탭 런닝, 2026-11-09) — day.runs = [{ km, min }]. 판정과 무관하고 운동 여부에만 쓰인다. */
+export function runsOf(state, ds) {
+  var r = getDay(state, ds).runs;
+  return Array.isArray(r) ? r : [];
+}
+/* 그날 운동했는가 — 운동 슬롯 기록, 런닝 기록, 담금질 운동 O 중 하나. 'slot' | 'run' | 'manual' | null.
+   담금질 운동 줄과 추이의 운동 행이 같은 기준을 쓴다. e='off'(안 함)는 운동이 아니다. */
+export function exercisedOn(state, ds) {
+  var d = getDay(state, ds);
+  if (isSlot(d.e)) return 'slot';
+  if (runsOf(state, ds).length) return 'run';
+  if (d.fx === true) return 'manual';
+  return null;
+}
 
 export function statusOf(state, ds) {
   var d = getDay(state, ds), goals = goalsOf(state, ds), full = true, min = true;
@@ -264,7 +288,7 @@ export function completion(state, ds) {
 /* 그날 무엇이든 기록했는가 — 오늘 캔들과 캘린더에서 '진행중(무색)'과 현재 상태 표시를 가른다. */
 export function dayRecorded(state, ds) {
   var rec = getDay(state, ds);
-  return completion(state, ds) > 0 || !!rec.w || checksMarked(state, ds) || isSlot(rec.e) ||
+  return completion(state, ds) > 0 || !!rec.w || checksMarked(state, ds) || isSlot(rec.e) || rec.e === SLOT_OFF ||
     WEEKLIES.some(function (item) { return rec[item.key]; });
 }
 
@@ -293,6 +317,10 @@ export function gapsOf(state, ds) {
    tone: done 완료, plan 대기, warn 백업 필요, lost 오늘 슬롯 끝, off 주말. */
 export function slotGuidance(state, ds, hour, live) {
   var planned = plannedSlot(state, ds), actual = getDay(state, ds).e;
+  if (actual === SLOT_OFF) {
+    return planned ? { tone: 'lost', text: '운동 안 함으로 기록. 오늘은 최소 포지션까지만 찍힌다.' } :
+      { tone: 'off', text: '운동 안 함으로 기록. 주말은 상태에 영향 없음.' };
+  }
   if (!isSlot(actual)) actual = null;
   if (!planned) {
     return actual ? { tone: 'done', text: SLOTS[actual] + ' 기록됨. 주말은 상태에 영향 없음.' } :
@@ -412,8 +440,10 @@ function weeklyMonthStats(state, ym, today, item) {
   var friday = investmentReviewWindow(monthStart).friday;
   if (friday < monthStart) friday = shift(friday, 7);
 
+  var until = item.endKey ? state[item.endKey] : null;
   while (friday <= monthEnd) {
     var win = investmentReviewWindow(friday);
+    if (typeof until === 'string' && win.friday >= until) break; // 은퇴 후 주는 표본이 아니다
     if (win.sunday >= start) {
       var from = win.monday > start ? win.monday : start;
       var to = yest < win.sunday ? yest : win.sunday;
@@ -460,6 +490,11 @@ export function habitMonthStats(state, ym, today) {
   var checks = checkItems.map(function (item) {
     return { key: item.key, name: item.statName, unit: '회', days: 0, full: 0, min: 0, miss: 0, sum: 0 };
   });
+  /* 운동 행(2026-11-09): 시간표 시작일(exerciseSlotStart)부터, 운동한 날 = 정상, 아니면 미달, 누적 = 운동한 날 수 */
+  var exSince = state[EXERCISE_SLOT.startKey];
+  var exercise = typeof exSince === 'string' ?
+    { key: 'ex', name: '운동', unit: '일', days: 0, full: 0, min: 0, miss: 0, sum: 0 } : null;
+  var runRow = { key: 'run', name: '런닝', unit: 'km', days: 0, full: 0, min: 0, miss: 0, sum: 0 };
   var w = { o: 0, x: 0, na: 0 }, total = 0, cur = from;
   while (cur <= to) {
     total++;
@@ -479,9 +514,21 @@ export function habitMonthStats(state, ym, today) {
       if (d[checkItems[ci].key] === 'o') { cs.full++; cs.sum++; } else cs.miss++;
     }
     if (d.w === 'o') w.o++; else if (d.w === 'x') w.x++; else w.na++;
+    if (exercise && cur >= exSince) {
+      exercise.days++;
+      if (exercisedOn(state, cur)) { exercise.full++; exercise.sum++; } else exercise.miss++;
+    }
+    var runs = runsOf(state, cur);
+    if (runs.length) {
+      runRow.full++;
+      runs.forEach(function (r) { runRow.sum += r.km; });
+    }
     cur = shift(cur, 1);
   }
-  habits.concat(checks).forEach(function (row) {
+  runRow.sum = Math.round(runRow.sum * 10) / 10;
+  /* 런닝 행은 그 달에 기록이 있을 때만. 정상 = 뛴 날 수, 누적 = km, 정상률은 없다 */
+  var extra = (exercise ? [exercise] : []);
+  habits.concat(checks, extra).forEach(function (row) {
     var n = row.days;
     row.fullRate = n ? Math.round(row.full / n * 100) : null;
     row.minRate = n ? Math.round((row.full + row.min) / n * 100) : null;
@@ -489,9 +536,14 @@ export function habitMonthStats(state, ym, today) {
   /* 은퇴한 습관은 표본이 있는 달(은퇴 전)에만 행을 남긴다. 아직 활성일 전인 습관은 기존처럼 0, — 로 둔다. */
   habits = habits.filter(function (hs, k) { return !(goals[k].until && hs.days === 0); });
   /* weeklies: 활성화된 주간 항목 행(투자 원칙, 손익비 스냅샷 순). investment는 기존 호출 호환. */
-  var weeklies = WEEKLIES.map(function (item) { return weeklyMonthStats(state, ym, today, item); })
-    .filter(function (row) { return row; });
-  return { total: total, habits: habits, checks: checks, weeklies: weeklies, investment: weeklyMonthStats(state, ym, today, INVESTMENT_REVIEW), w: w };
+  var weeklies = WEEKLIES.map(function (item) {
+    var row = weeklyMonthStats(state, ym, today, item);
+    /* 은퇴한 주간 항목은 표본이 있는 달에만 행을 남긴다(스쿼트와 같은 규칙) */
+    if (row && item.endKey && typeof state[item.endKey] === 'string' && row.total === 0) return null;
+    return row;
+  }).filter(function (row) { return row; });
+  if (runRow.full) { runRow.fullRate = null; runRow.minRate = null; runRow.miss = '—'; runRow.min = '—'; extra.push(runRow); }
+  return { total: total, habits: habits, checks: checks, exercise: extra, weeklies: weeklies, investment: weeklyMonthStats(state, ym, today, INVESTMENT_REVIEW), w: w };
 }
 
 /* 월별 장부 — startDate부터 어제까지(확정일, 오늘 제외), 최신 월부터.

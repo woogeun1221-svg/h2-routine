@@ -11,6 +11,7 @@ import { renderToday, renderSlot } from './views/today.js';
 import { renderPlan, renderPlanClock, planDayRange } from './views/plan.js';
 import { renderTrends } from './views/trends.js';
 import { renderSettings } from './views/settings.js';
+import { renderRun } from './views/run.js';
 import { createReminderClient, reminderStatusText, parseConnectCode } from './reminders.js';
 import { createPushClient, pushStatusText } from './push.js';
 import { reflectionArchiveText } from './reflection.js';
@@ -40,7 +41,6 @@ var planMode = readPlanMode();
 var planDay = todayStr();                        // 일간 보기 날짜 — 진입과 자정마다 오늘로
 var lastBotSync = null, botSyncFailed = false, botSyncing = false;
 var resetArmed = false;        // 기록 초기화 2단계 확인 중
-var calendarMode = 'self';
 var archiveFilters = { month: 'all', query: '', limit: 20 };
 var reminders = createReminderClient({ onStatus: renderReminderStatus });
 /* 앱 푸시 알림 — 구독 등록은 reminders 의 기기 인증으로. SW 등록은 registerSW 가 준 것을 우선 쓴다. */
@@ -201,7 +201,7 @@ function setForge(key, value) {
   save(); render();
 }
 function toggleSlot(slot) {
-  if (!isSlot(slot)) return;
+  if (!isSlot(slot) && slot !== 'off') return; // off = 오늘 운동 안 함
   var t = targetDay();
   var cur = getDay(state, t).e || null;
   ensureDay(t).e = (cur === slot) ? null : slot;
@@ -301,6 +301,37 @@ function resetGoals() {
 }
 
 /* ---------- tabs ---------- */
+/* 헬스 탭 안의 근력 | 런닝 전환(이 기기 편의 설정). 런닝은 루틴 기록 day.runs에 저장한다. */
+var HEALTH_MODE_KEY = 'h2-routine-health-mode';
+var healthMode = (function () { try { return localStorage.getItem(HEALTH_MODE_KEY) === 'run' ? 'run' : 'gym'; } catch (e) { return 'gym'; } })();
+function setHealthMode(mode) {
+  healthMode = mode === 'run' ? 'run' : 'gym';
+  try { localStorage.setItem(HEALTH_MODE_KEY, healthMode); } catch (e) {}
+  render();
+}
+function renderHealth() {
+  document.querySelectorAll('[data-health]').forEach(function (b) {
+    var on = b.dataset.health === healthMode;
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+  });
+  document.getElementById('ironMount').hidden = healthMode !== 'gym';
+  document.getElementById('runScreen').hidden = healthMode !== 'run';
+  if (healthMode === 'gym') mountIronTab();
+  else renderRun(state, todayStr(), { addRun: addRun, removeRun: removeRun });
+}
+function addRun(ds, run) {
+  var d = ensureDay(ds);
+  d.runs = (Array.isArray(d.runs) ? d.runs : []).concat([run]);
+  save(); render();
+}
+function removeRun(ds, i) {
+  var d = state.days[ds];
+  if (!d || !Array.isArray(d.runs)) return;
+  d.runs = d.runs.filter(function (_, k) { return k !== i; });
+  if (!d.runs.length) delete d.runs;
+  save(); render();
+}
+
 var SCREENS = { today: 'screen-today', plan: 'screen-plan', trends: 'screen-trends', iron: 'screen-iron', settings: 'screen-settings' };
 
 /* ---------- 헬스 탭 (Iron Terminal, React) — 처음 열 때만 지연 로드와 마운트 ----------
@@ -311,10 +342,10 @@ function mountIronTab() {
   if (ironMounted) return;
   ironMounted = true;
   import('./iron/mount.tsx').then(function (m) {
-    m.mountIron(document.getElementById('screen-iron'));
+    m.mountIron(document.getElementById('ironMount'));
   }, function (e) {
     ironMounted = false;
-    document.getElementById('screen-iron').textContent =
+    document.getElementById('ironMount').textContent =
       '헬스 화면을 불러오지 못했어 — ' + (e && e.message ? e.message : '네트워크를 확인해줘.');
   });
 }
@@ -370,13 +401,13 @@ function render() {
   } else if (activeTab === 'trends') {
     if (!trendYm) trendYm = t.slice(0, 7);
     renderTrends(state, t, trendYm, {
-      mode: calendarMode, archiveFilters: archiveFilters,
+      archiveFilters: archiveFilters,
       exportArchive: function () {
         downloadTextFile(reflectionArchiveText(state, todayStr()), 'h2-reflection-archive-' + todayStr() + '.md', 'text/markdown');
       }
     });
   } else if (activeTab === 'iron') {
-    mountIronTab();
+    renderHealth();
   } else {
     renderSettings(state, { setGoal: setGoal });
     renderResetArm();
@@ -391,6 +422,9 @@ function renderResetArm() {
   document.getElementById('resetConfirm').hidden = !resetArmed;
 }
 
+document.querySelectorAll('[data-health]').forEach(function (b) {
+  b.addEventListener('click', function () { setHealthMode(b.dataset.health); });
+});
 document.querySelectorAll('.tabbar .tab').forEach(function (b) {
   b.addEventListener('click', function () { switchTab(b.dataset.tab); });
 });
@@ -406,9 +440,6 @@ document.getElementById('calPrev').addEventListener('click', function () {
 });
 document.getElementById('calNext').addEventListener('click', function () {
   trendYm = shiftMonth(trendYm, 1); render();
-});
-document.querySelectorAll('[data-calendar-mode]').forEach(function (button) {
-  button.addEventListener('click', function () { calendarMode = button.dataset.calendarMode; render(); });
 });
 
 /* ---------- export / import / reset (설정 화면) ---------- */

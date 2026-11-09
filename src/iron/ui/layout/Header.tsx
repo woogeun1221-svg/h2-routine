@@ -93,30 +93,27 @@ export function Header({
   return (
     <header className="header">
       <div className="header-row iron-head-row">
-        <h2 className="iron-title">헬스</h2>
-        <div className="row">
-          {!online && (
-            <span className="offline-badge" role="status">
-              오프라인
-            </span>
-          )}
-          {onOpenSettings != null && (
-            <button
-              type="button"
-              className="btn ghost iron-icon-btn"
-              aria-label="설정"
-              onClick={onOpenSettings}
-            >
-              <Settings size={20} aria-hidden />
-            </button>
-          )}
-        </div>
+        <ProgramTabs
+          programs={programs}
+          active={program}
+          onSelect={onSelectProgram}
+        />
+        {!online && (
+          <span className="offline-badge" role="status">
+            오프라인
+          </span>
+        )}
+        {onOpenSettings != null && (
+          <button
+            type="button"
+            className="btn ghost iron-icon-btn"
+            aria-label="설정"
+            onClick={onOpenSettings}
+          >
+            <Settings size={20} aria-hidden />
+          </button>
+        )}
       </div>
-      <ProgramTabs
-        programs={programs}
-        active={program}
-        onSelect={onSelectProgram}
-      />
       <div className="iron-meta">
         <StreakInline streak={streak} />
         {day != null && (

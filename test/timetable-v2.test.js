@@ -239,7 +239,7 @@ describe('저장 스키마 v2 — e, plans, exerciseSlotStart, v', () => {
   });
   it('내보내기 왕복 보존', () => {
     const s = { ...st({ [MON]: { ...FULL, e: 'noon' } }, {
-      investmentReviewStart: START, rrSnapshotStart: START,
+      investmentReviewStart: START, rrSnapshotStart: START, rrSnapshotEnd: THU,
       plans: { [MON]: { 1: 'am', 2: 'noon', 3: 'run', 4: 'am', 5: 'am', m1: '메모' } }
     }), v: 2 };
     expect(importText(exportText(s), THU)).toEqual(s);

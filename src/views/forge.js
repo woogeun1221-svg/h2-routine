@@ -53,8 +53,8 @@ function forgeRow(state, t, h, day, item) {
 
   var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn forge-btn';
   if (item.key === 'fx') {
-    if (mark === 'slot') {
-      btn.textContent = '슬롯 완료'; btn.disabled = true; btn.classList.add('sel-o');
+    if (mark === 'slot' || mark === 'run') {
+      btn.textContent = mark === 'slot' ? '슬롯 완료' : '런닝 완료'; btn.disabled = true; btn.classList.add('sel-o');
     } else {
       btn.textContent = mark ? 'O 했다' : 'O 하기';
       if (mark) btn.classList.add('sel-o');
@@ -88,6 +88,7 @@ function statusText(item, st, mark, isToday) {
   var range = st.win.start === st.win.end ? '' : md(st.win.start) + '–' + md(st.win.end) + ', ';
   if (item.key === 'fx') {
     if (mark === 'slot') return '운동 슬롯 기록으로 인정.';
+    if (mark === 'run') return '런닝 기록으로 인정.';
     if (mark) return (isToday ? '오늘' : '그날') + ' 운동 완료.';
     return isToday ? '오늘 아직. 종류 무관, 몸을 쓰면 O.' : '그날 기록 없음.';
   }

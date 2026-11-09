@@ -424,7 +424,7 @@ def send_push(subscriptions, payload, vapid_file=VAPID_FILE):
 
 
 def friday_note(now):
-    return ' 금요일이라 투자 원칙 검토와 손익비 스냅샷도 오늘까지.' if now.weekday() == 4 else ''
+    return ' 금요일이라 투자 원칙 검토도 오늘까지.' if now.weekday() == 4 else ''
 
 
 def hour_label(hour):

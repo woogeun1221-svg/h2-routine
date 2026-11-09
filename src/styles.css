@@ -512,7 +512,6 @@ h1.date .dplus:empty { display: none; }
 .reflection-months .selected-month { background: var(--brass-dim); }
 .archive-jump { margin-top: 2px; padding-left: 0; min-height: 40px; color: var(--brass); }
 .cal-section { margin-top: 22px; }
-.calendar-modes { margin: 0 0 14px; }
 .cal-card { margin-top: 10px; padding: 12px 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); }
 .cal-head { display: flex; align-items: center; justify-content: space-between; }
 .cal-label { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
@@ -540,6 +539,18 @@ h1.date .dplus:empty { display: none; }
 .reflection-cell.reflection-o { background: var(--red-dim); color: var(--red); }
 .reflection-cell.reflection-x { background: var(--blue-dim); color: var(--blue); }
 .reflection-cell:focus-visible { outline: 2px solid var(--brass); }
+/* 합친 캘린더(2026-11-09): 칸 색 = 루틴 포지션, 칸 아래 작은 배지 = 만족도 O / X */
+.cal-cell.combo { flex-direction: column; gap: 2px; border: 0; cursor: pointer; line-height: 1.1; padding: 0; font-family: inherit; }
+.cal-cell.combo span { font-size: 11px; }
+.cal-cell.combo b {
+  min-width: 18px; padding: 1px 4px; border-radius: 6px; font-size: 11px; font-weight: 800; line-height: 1.3;
+  background: rgba(11,12,14,.62); color: #fff;
+}
+.cal-cell.combo.self-x b { color: #8FB3FF; }
+.cal-cell.combo.self-o b { color: #FF8F87; }
+.cal-cell.combo.self-none b { background: none; color: inherit; opacity: .55; font-weight: 600; }
+.cal-cell.combo.pending.self-none b, .cal-cell.combo.pending span { color: var(--text); }
+.cal-cell.combo:focus-visible { outline: 2px solid var(--brass); }
 .reflection-day { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
 .reflection-day p { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
 .reflection-archive { margin-top: 28px; scroll-margin-top: 22px; }
@@ -628,9 +639,8 @@ table.ledger.month-ledger th:last-child, table.ledger.month-ledger td:last-child
 .settings-todo { color: var(--faint); font-style: normal; opacity: .8; }
 
 /* ---------- 헬스 탭 (Iron Terminal 마운트 컨테이너) ----------
-   .app 의 좌우 패딩을 상쇄해 Iron 헤더와 보조 메뉴를 화면 폭 그대로 쓴다.
+   2026-11-09부터 루틴 화면과 같은 좌우 여백을 쓴다(머리 '헬스'와 근력 | 런닝은 호스트, Iron 안쪽 .app 패딩은 embedded.css에서 0).
    Iron 자체 스타일은 빌드 시 .iron-root 아래로만 적용된다. */
-#screen-iron { margin: 0 -16px; }
 
 /* ---------- 좁은 폭(320~360) ---------- */
 @media (max-width: 360px) {
@@ -642,7 +652,6 @@ table.ledger.month-ledger th:last-child, table.ledger.month-ledger td:last-child
   .tt-block small { display: none; }
   .tt-date { font-size: 15px; }
   .slot-tag { right: 3px; }
-  #screen-iron { margin: 0 -14px; }
 }
 
 /* ---------- 27 담금질 (사이드 프로젝트, 오늘 화면 맨 위) ----------
@@ -692,3 +701,51 @@ table.ledger.month-ledger th:last-child, table.ledger.month-ledger td:last-child
 .forge-track .ft.future { background: var(--surface2); }
 .forge-track .ft.cur { outline: 1.5px solid var(--text); outline-offset: 1.5px; }
 .forge-track.dense .ft.cur { outline-width: 1px; outline-offset: 1px; }
+.slot-off { width: 100%; margin-top: 8px; min-height: 40px; font-size: 13px; font-weight: 600; color: var(--muted); background: none; border: 1px dashed var(--line2); }
+.slot-off.sel-x { border-style: solid; }
+
+/* ---------- 헬스 탭 머리(근력 | 런닝)와 런닝 화면 (2026-11-09) ---------- */
+.health-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.health-title { font-size: 28px; font-weight: 700; line-height: 1.15; letter-spacing: -0.035em; }
+.health-modes .seg-btn { min-width: 64px; }
+#ironMount { margin-top: 0; }
+#runScreen { margin-top: 10px; }
+#runScreen .card + .card, #runScreen .chips + .card { margin-top: 10px; }
+.run-fields { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 8px; margin-top: 12px; }
+.run-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 12px; font-weight: 600; color: var(--faint); }
+.run-field input {
+  width: 100%; min-width: 0; min-height: 44px; padding: 0 10px; border-radius: 12px; border: 1px solid transparent;
+  background: var(--surface2); color: var(--text); font-size: 16px; font-variant-numeric: tabular-nums;
+}
+.run-field input:focus { outline: none; border-color: var(--red-line); }
+.run-field input[type="date"] { font-size: 14px; padding: 0 6px; }
+.run-pace { margin-top: 10px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.run-err { font-size: 12px; color: var(--brass); min-height: 0; }
+.run-err:empty { display: none; }
+.run-add { width: 100%; margin-top: 10px; background: var(--red); color: #fff; }
+.run-add:active { background: var(--red); filter: brightness(.92); }
+.run-chips { margin-top: 10px; }
+.run-chips .chip b { font-size: 17px; }
+.run-bars { display: flex; gap: 6px; align-items: flex-end; margin-top: 12px; height: 132px; }
+.run-bar { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
+.run-bar i { flex: 1; width: 100%; display: flex; align-items: flex-end; border-radius: 6px; background: var(--surface2); overflow: hidden; }
+.run-bar i b { display: block; width: 100%; background: var(--red-line); border-radius: 6px 6px 0 0; }
+.run-bar.cur i b { background: var(--red); }
+.run-bar-v { font-size: 10.5px; color: var(--muted); min-height: 14px; }
+.run-bar-l { font-size: 10.5px; color: var(--faint); }
+.run-list ul { list-style: none; margin-top: 6px; }
+.run-list li {
+  display: grid; grid-template-columns: 1fr auto auto auto 36px; align-items: center; gap: 10px;
+  padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px;
+}
+.run-list li:first-child { border-top: none; }
+.run-d { color: var(--muted); font-size: 13px; }
+.run-t, .run-p { color: var(--muted); font-size: 13px; }
+.run-x { width: 36px; height: 36px; border: none; border-radius: 10px; background: var(--surface2); color: var(--faint); font-size: 18px; cursor: pointer; }
+.run-empty { margin-top: 8px; font-size: 13px; color: var(--faint); }
+@media (max-width: 360px) {
+  .run-fields { grid-template-columns: 1fr 1fr; }
+  .run-fields .run-field:first-child { grid-column: 1 / -1; }
+  .run-chips .chip { padding: 10px 10px; }
+  .run-chips .chip b { font-size: 15px; }
+}

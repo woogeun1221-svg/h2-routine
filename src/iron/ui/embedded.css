@@ -33,19 +33,18 @@
 .mono, .num { font-family: var(--font-kr); font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; letter-spacing: -0.01em; }
 
 /* ---------- 상단: 제목, 상체 하체 세그먼트, 요약 칩, 화면 메뉴 ---------- */
-.iron-top { position: sticky; top: env(safe-area-inset-top); z-index: 30; background: var(--bg-0); }
+.iron-top { position: sticky; top: env(safe-area-inset-top); z-index: 30; background: var(--bg-0); padding-top: 10px; }
 .iron-top .header {
   position: static; background: var(--bg-0); border-bottom: none;
-  padding: 10px 0 0; gap: 12px; backdrop-filter: none; -webkit-backdrop-filter: none;
+  padding: 0; gap: 10px; backdrop-filter: none; -webkit-backdrop-filter: none;
 }
 .iron-head-row { align-items: center; }
-.iron-title { font-size: 28px; font-weight: 700; letter-spacing: -0.035em; line-height: 1.15; }
 .iron-icon-btn {
-  min-width: 44px; min-height: 44px; width: 44px; padding: 0; border: none;
+  flex: 0 0 auto; min-width: 44px; min-height: 44px; width: 44px; padding: 0; border: none;
   border-radius: 13px; background: var(--bg-2); color: var(--text);
 }
 .program-tabs {
-  display: flex; width: 100%; padding: 3px; gap: 2px;
+  display: flex; flex: 1; min-width: 0; padding: 3px; gap: 2px;
   background: var(--bg-2); border: none; border-radius: 13px;
 }
 .program-tab {
@@ -86,8 +85,8 @@
 .iron-subnav-item.is-input[aria-selected="true"] { background: var(--up-soft); color: var(--up); }
 
 /* 호스트가 문서 스크롤을 담당 — 뷰포트 높이 강제, 내부 스크롤, 하단 네비 여백 불필요 */
-.app { min-height: 0; }
-.screen { overflow-y: visible; padding: 18px 0 24px; max-width: none; }
+.app { min-height: 0; padding: 0; max-width: none; } /* 루틴 .app 규칙(패딩 16px)이 Iron 안쪽 .app에도 걸리므로 걷는다 */
+.screen { overflow-y: visible; padding: 10px 0 24px; max-width: none; }
 .screen-title { font-size: 20px; font-weight: 700; letter-spacing: -0.03em; }
 .screen-sub { color: var(--text-faint); }
 

@@ -107,7 +107,7 @@ class ReminderTests(unittest.TestCase):
         friday = datetime(2026, 9, 18, 21, 0, tzinfo=KST)
         self.store.answer(self.token, '2026-09-18', True, friday, routine=False)
         self.assertEqual(self.run_reminder(friday), 'sent')
-        self.assertIn('투자 원칙 검토와 손익비 스냅샷', self.sender.call_args[0][0])
+        self.assertIn('금요일이라 투자 원칙 검토도 오늘까지', self.sender.call_args[0][0])
 
     def test_routine_and_reflection_are_independent_per_day(self):
         self.assertEqual(self.run_reminder(self.evening), 'sent')
@@ -212,7 +212,7 @@ class ReminderTests(unittest.TestCase):
         self.assertEqual(payload['tag'], 'h2-routine-routine')
         self.assertTrue(payload['body'].startswith('오후 1시.'))
         self.assertIn('가슴을 당당히 펴고 있는가?', payload['body'])
-        self.assertIn('투자 원칙 검토와 손익비 스냅샷', payload['body'])
+        self.assertIn('금요일이라 투자 원칙 검토도 오늘까지', payload['body'])
         self.assertNotIn('밤 9시', payload['body'])
         self.assertNotIn('·', payload['body'])
         self.sender.assert_not_called()

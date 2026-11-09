@@ -96,7 +96,7 @@ describe('저장 스키마 — pullupStart, t, settings.t', () => {
   it('freshState에 pullupStart', () => {
     expect(freshState('2026-10-19')).toEqual({
       v: 2, startDate: '2026-10-19', investmentReviewStart: '2026-10-19', rrSnapshotStart: '2026-10-19',
-      pullupStart: '2026-10-19', squatEnd: '2026-10-19', postureStart: '2026-10-19', exerciseSlotStart: '2026-10-19', days: {}
+      pullupStart: '2026-10-19', squatEnd: '2026-10-19', postureStart: '2026-10-19', exerciseSlotStart: '2026-10-19', rrSnapshotEnd: '2026-10-19', days: {}
     });
   });
   it('옛 백업 가져오기: pullupStart를 오늘로 채우고 기록은 그대로', () => {

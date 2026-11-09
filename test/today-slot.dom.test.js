@@ -44,7 +44,7 @@ describe('오늘 — 운동 슬롯 블록', () => {
     renderToday(s, MON, h);
     expect(slot().hidden).toBe(false);
     expect(slot().querySelector('.slot-plan').textContent).toBe('계획 점심');
-    const buttons = [...slot().querySelectorAll('.btn')];
+    const buttons = [...slot().querySelectorAll('.btn[data-slot]')];
     expect(buttons.map(b => b.dataset.slot)).toEqual(['am', 'noon', 'run']);
     expect(buttons[1].className).toContain('planned');
     expect(buttons[1].querySelector('.slot-tag').textContent).toBe('계획');

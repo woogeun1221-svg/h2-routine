@@ -189,13 +189,13 @@ export function renderReflectionArchive(state, today, filters = { month: 'all', 
   renderList();
 }
 
-export function showReflectionDay(state, day) {
+export function showReflectionDay(state, day, position) {
   const root = document.getElementById('reflectionDay');
   if (!root) return;
   const entry = getDay(state, day);
   root.replaceChildren(); root.hidden = false;
   const title = document.createElement('b');
-  title.textContent = day.replaceAll('-', '.') + ', ' + (entry.self?.toUpperCase() || '미응답');
+  title.textContent = day.replaceAll('-', '.') + (position ? ', 루틴 ' + position : '') + ', 만족도 ' + (entry.self?.toUpperCase() || '미응답');
   root.appendChild(title);
   if (entry.selfReason || entry.self === 'x') {
     const reason = document.createElement('p');

@@ -48,7 +48,7 @@ describe('하루 만족도', () => {
     const state = { startDate: day, investmentReviewStart: day, rrSnapshotStart: day, pullupStart: day, squatEnd: day, postureStart: day,
       days: { [day]: { ...full, t: 20, c: 'o', self: 'x', selfReason: '핵심 일을 미룸' } } }; // 활성일 당일이라 턱걸이, 가슴 펴기도 필요, 스쿼트는 제외
     // v2: 가져오기는 버전 표시와 운동 슬롯 활성일(가져온 날)만 덧붙이고 기록은 그대로
-    expect(importText(exportText(state), day)).toEqual({ ...state, v: 2, exerciseSlotStart: day });
+    expect(importText(exportText(state), day)).toEqual({ ...state, v: 2, exerciseSlotStart: day, rrSnapshotEnd: day });
     expect(statusOf(state, day)).toBe('full');
     expect(validateState({ ...state, days: { [day]: { self: true } } })).toContain('.self');
     expect(validateState({ ...state, days: { [day]: { selfReason: {} } } })).toContain('.selfReason');

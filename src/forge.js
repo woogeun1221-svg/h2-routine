@@ -2,8 +2,8 @@
    statusOf, 스트릭, 알림, 봇 요약에는 들어가지 않는다(루틴 판정은 그대로). 오늘 화면 맨 위 블록과 자기 집계만 쓴다.
    기간은 선언된 약속이라 활성일(처음 연 날) 대신 고정 날짜다. 주는 시작일(월요일)부터 7일, 격주는 14일 단위.
    기록은 완료한 날의 day 필드에 남긴다: bk(읽은 책), wr(쓴 글), stk(본 종목)는 제목 문자열, fx는 운동 O(불리언).
-   운동은 fx가 아니어도 그날 운동 슬롯(e)을 기록했으면 한 것으로 본다(주말 기록 포함). */
-import { getDay, shift, daysBetween, isSlot } from './logic.js';
+   운동은 fx가 아니어도 그날 운동 슬롯(e)이나 런닝(runs)을 기록했으면 한 것으로 본다(주말 포함, logic.exercisedOn). */
+import { getDay, shift, daysBetween, exercisedOn } from './logic.js';
 
 export const FORGE = { name: '27 담금질', sub: '2027년을 위한 기준 올리기', start: '2026-11-09', end: '2026-12-31' };
 export const FORGE_ITEMS = [
@@ -38,7 +38,7 @@ export function forgeWindowOf(item, ds) {
 /* 그날 기록 — 글 항목은 제목(빈 문자열은 없음), 운동은 'manual' | 'slot' | null. */
 export function forgeMark(state, item, ds) {
   var d = getDay(state, ds);
-  if (item.key === 'fx') return d.fx === true ? 'manual' : (isSlot(d.e) ? 'slot' : null);
+  if (item.key === 'fx') return exercisedOn(state, ds); // 'slot' | 'run' | 'manual' | null
   var v = d[item.key];
   return (typeof v === 'string' && v.trim()) ? v.trim() : null;
 }

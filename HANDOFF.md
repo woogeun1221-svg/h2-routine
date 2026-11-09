@@ -1,3 +1,30 @@
+# 운동 안 함, 추이 운동, 캘린더 합치기, 손익비 은퇴, 런닝 — 2026-11-09 저녁
+
+## 현재 작업
+
+사용자 요청: "운동 슬롯 기준 안하는것도 있을텐데 이건 없네. 추이에 운동도 넣어줘. 하루 만족도와 루틴 달성이 따로따로 선택해야해서 잘 안보여.
+더 직관적으로. 손익비 스냅샷은 제거. 헬스에 런닝도 기록."
+
+- 운동 안 함 `e: 'off'`(storage 허용, `toggleSlot('off')`, `slotGuidance` 문구, `dayRecorded`, 오늘 슬롯 블록 `.slot-off` 버튼, `[data-slot]` 셋은 그대로).
+- `exercisedOn`, `runsOf`(logic), `habitMonthStats().exercise`(운동 행, 런닝 행), trends 표에 이어 붙임.
+- 캘린더 합침: `renderTrends`의 mode 제거, 칸 `.cal-cell.combo.{kind}.self-{o|x|none}`, `showReflectionDay(state, day, position)`. `index.html` 전환 버튼 삭제, `main.js` calendarMode 삭제.
+- 손익비 은퇴: `RR_SNAPSHOT.endKey`, `START_KEYS`에 주간 endKey, `weeklyStatus`와 `weeklyMonthStats`가 종료일 이후 금요일 제외, 오늘 카드 숨김. 룰 노트 줄 삭제.
+  `scripts/reminder_service.py` 금요일 문구(remind는 launchd가 매번 새로 실행해 재시작 없이 반영) + 파이썬 테스트 기대값.
+- 런닝: `src/views/run.js`, `index.html` 헬스 머리와 `#ironMount`, `#runScreen`, `main.js` `renderHealth`, `addRun`, `removeRun`, storage `validateRuns`.
+  Header.tsx는 '헬스' 제목을 빼고(호스트 소유) 상체 하체와 설정 한 줄. 헬스 탭 좌우 여백을 루틴과 같게(`#screen-iron` 음수 여백 삭제, Iron 안쪽 `.app` 패딩 0).
+- 결정(사용자 미확인): 안 함은 면제가 아니라 기록(판정 동일), 런닝은 슬롯을 채우지 않음, 런닝 데이터는 루틴 기록에(Iron 저장소 아님), Iron 근력 세션은 운동 판정에 안 들어감.
+
+## 검증
+
+- `npm test` 37 files / 415 tests(`test/health-run-batch.test.js` 13 추가, 기존 7건은 rrSnapshotEnd와 버튼 선택자 기대값 갱신). typecheck, build 통과.
+- 파이썬 `scripts` 단위 테스트 통과. `node scripts/browser_qa.cjs` 통과(rr 카드 없음, 안 함 저장과 문구, 합친 캘린더, 운동 행, 런닝 기록과 삭제, 320 넘침 0). 화면 `/private/tmp/h2-routine-qa/run-*.png`, `v2-trends-*.png`.
+
+## 남은 일
+
+- 사용자 "오케이 넣어줄 수 있겠어? 헬스탭 상단 여백 없애줘": 헬스 머리 여백 축소(health-head 4px, Iron 상단 10px, 화면 제목 위 10px) 후 배포.
+
+---
+
 # 27 담금질 프로젝트, 헬스 탭 디자인 개편 — 2026-11-09
 
 ## 현재 작업

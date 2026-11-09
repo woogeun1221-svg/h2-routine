@@ -120,6 +120,6 @@ describe('저장 스키마 — postureStart, c', () => {
     expect(validateState({ ...base, days: { [START]: { ...FULL3, c: 'O' } } })).toContain('.c');
     expect(validateState({ ...base, postureStart: '2026/11/03' })).not.toBe(null);
     const s = st({ [START]: { ...FULL3, c: 'x' } }, { investmentReviewStart: START, rrSnapshotStart: START });
-    expect(importText(exportText(s), START)).toEqual({ ...s, v: 2, exerciseSlotStart: START }); // v2 필드만 덧붙는다
+    expect(importText(exportText(s), START)).toEqual({ ...s, v: 2, exerciseSlotStart: START, rrSnapshotEnd: START }); // v2 필드만 덧붙는다
   });
 });

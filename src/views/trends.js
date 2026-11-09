@@ -8,33 +8,23 @@ import { renderReflectionHistory, renderReflectionArchive, showReflectionDay } f
 /* v2부터 월요일 시작(calMonth.lead와 같은 순서). 토일은 황동 라벨. */
 var WD = ['월', '화', '수', '목', '금', '토', '일'];
 
+var POSITION = { full: '정상', min: '최소', miss: '미달', pending: '진행 중' };
+
+/* 2026-11-09: 하루 만족도와 루틴 달성 캘린더를 하나로 합쳤다(전환 버튼 없음).
+   칸 색 = 루틴 포지션(빨강 정상, 황동 최소, 파랑 미달), 칸 안 글자 = 만족도 O / X / —(미응답).
+   칸을 누르면 그날 포지션과 만족도, X 사유가 아래에 나온다. options.mode는 옛 호출 호환용으로 무시한다. */
 export function renderTrends(state, t, ym, options = {}) {
-  const mode = options.mode || 'self';
   renderReflectionHistory(state, ym, t);
   renderReflectionArchive(state, t, options.archiveFilters, options);
   document.getElementById('curStreak').textContent = streak(state, t) + '일';
   document.getElementById('maxStreak').textContent = longestStreak(state, t) + '일';
-
-  document.querySelectorAll('[data-calendar-mode]').forEach(button => {
-    const selected = button.dataset.calendarMode === mode;
-    button.setAttribute('aria-pressed', String(selected));
-    button.classList.toggle('sel-o', selected);
-  });
-  const streaks = document.getElementById('routineStreaks');
-  if (streaks) streaks.hidden = mode !== 'routine';
-  renderCalendar(state, t, ym, mode);
+  renderCalendar(state, t, ym);
   renderHabitStats(state, t, ym);
   renderMonthly(state, t);
 }
 
-function renderCalendar(state, t, ym, mode) {
+function renderCalendar(state, t, ym) {
   document.getElementById('calLabel').textContent = ym.replace('-', '.');
-  const title = document.getElementById('calendarTitle');
-  if (title) title.textContent = mode === 'self' ? '하루 만족도' : '루틴 달성';
-  const legend = document.getElementById('calendarLegend');
-  if (legend) legend.innerHTML = mode === 'self' ?
-    '<span class="self-o">O 만족</span><span class="self-x">X 불만족</span><span>— 미응답</span>' :
-    '<span><i style="background:var(--red)"></i>정상</span><span><i style="background:var(--brass)"></i>최소</span><span><i style="background:var(--blue)"></i>미달</span>';
   const detail = document.getElementById('reflectionDay');
   if (detail) { detail.hidden = true; detail.replaceChildren(); }
 
@@ -59,24 +49,23 @@ function renderCalendar(state, t, ym, mode) {
     grid.appendChild(blank);
   }
   cal.cells.forEach(function (c) {
-    if (mode === 'self' && c.kind !== 'out' && c.kind !== 'future') {
+    if (c.kind !== 'out' && c.kind !== 'future') {
       const entry = getDay(state, c.ds);
       const answer = ['o', 'x'].includes(entry.self) ? entry.self : null;
       const button = document.createElement('button');
       button.type = 'button'; button.dataset.day = c.ds;
-      button.className = 'cal-cell reflection-cell reflection-' + (answer || 'unanswered') + (c.ds === t ? ' today' : '');
-      button.setAttribute('aria-label', c.ds + ', ' + (answer?.toUpperCase() || '미응답'));
+      button.className = 'cal-cell combo ' + c.kind + ' self-' + (answer || 'none') + (c.ds === t ? ' today' : '');
+      button.setAttribute('aria-label', c.ds + ', 루틴 ' + POSITION[c.kind] + ', 만족도 ' + (answer?.toUpperCase() || '미응답'));
       const date = document.createElement('span'); date.textContent = c.day;
       const mark = document.createElement('b'); mark.textContent = answer?.toUpperCase() || '—';
       button.append(date, mark);
-      button.addEventListener('click', () => showReflectionDay(state, c.ds));
+      button.addEventListener('click', () => showReflectionDay(state, c.ds, POSITION[c.kind]));
       grid.appendChild(button);
       return;
     }
     var cell = document.createElement('div');
     cell.className = 'cal-cell ' + c.kind + (c.ds === t ? ' today' : '');
     cell.textContent = c.kind === 'out' ? '' : c.day;
-    if (c.kind !== 'out' && c.kind !== 'future') cell.title = c.ds;
     grid.appendChild(cell);
   });
 }
@@ -96,7 +85,7 @@ function renderHabitStats(state, t, ym) {
     return;
   }
 
-  var rows = stats.habits.concat(stats.checks || [], stats.weeklies || []);
+  var rows = stats.habits.concat(stats.checks || [], stats.exercise || [], stats.weeklies || []);
   rows.forEach(function (h) {
     var tr = document.createElement('tr');
     tr.innerHTML = '<td>' + h.name + '</td>' +
