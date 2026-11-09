@@ -19,7 +19,9 @@
 
 ## 남은 일
 
-- 커밋과 `npm run deploy`는 사용자 OK 뒤. 서버와 launchd 변경 없음.
+- 운영 반영(2026-11-09, 사용자 "앱으로 옮기지는 않은건가"): 커밋 6ae6a7e, gh-pages 8d1c216 → a015eab, `git push origin main` 054a0e2..6ae6a7e.
+  번들 index-CqPGb8rB.js 약 15초 뒤 서빙, `--live-smoke` 통과(브라우저 오류 0). 서버와 launchd 변경 없음.
+- 사용자 아이폰 확인: 앱을 다시 열면 맨 위에 담금질 블록, 헬스 탭 새 디자인.
 
 ---
 
