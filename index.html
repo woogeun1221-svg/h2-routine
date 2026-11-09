@@ -143,8 +143,6 @@
         <div class="chip">루틴 최장 스트릭<b id="maxStreak">0일</b></div>
       </div>
 
-      <section id="reflectionArchive" class="reflection-archive" aria-label="X 사유 아카이브"></section>
-
       <div class="habit-section">
         <div class="strip-head"><span class="strip-title" id="habitTitle">습관별</span></div>
         <div class="ledger-wrap">
@@ -154,13 +152,16 @@
           </table>
         </div>
         <div class="wife-line" id="wifeLine"></div>
-        <div class="table-note">
+        <details class="note-fold">
+          <summary>기준 보기</summary>
+          <div class="table-note">
           습관별 정상 = 그 습관 목표만 충족한 날 / 장부와 캘린더 색의 정상 = 일간 습관 모두 + 가슴 펴기 O + 송은 X 없음 + 평일 운동 슬롯.
           운동 = 운동 슬롯, 런닝, 담금질 운동 O 중 하나라도 한 날(시간표 시작일부터). 런닝 = 뛴 날 수와 km.
           투자 원칙(주) = 금요일까지 정상, 주말 완료 최소, 일요일까지 미완료 미달.
           진행 중인 주는 제외하며 금요일이 속한 달에 집계한다. 손익비 스냅샷(주)은 2026-11-09 은퇴, 그 전 달에만 남는다.
           두 기준이 다르므로 회고 인용 시 구분할 것.
-        </div>
+          </div>
+        </details>
       </div>
 
       <div class="month-section" id="monthSection" style="display:none">
@@ -173,6 +174,11 @@
         </div>
         <div class="table-note">슬롯 = 운동 슬롯을 한 평일 / 슬롯 조건이 있던 평일(시간표 시작일부터). 송은 X = 송은 X 일수.</div>
       </div>
+
+      <details id="archiveFold" class="archive-fold">
+        <summary><span>X 사유 아카이브</span><small>검색, 월별 보기, 내보내기</small></summary>
+        <section id="reflectionArchive" class="reflection-archive" aria-label="X 사유 아카이브"></section>
+      </details>
     </div>
 
     <!-- ================= 헬스 (Iron Terminal, 처음 열 때 마운트) ================= -->

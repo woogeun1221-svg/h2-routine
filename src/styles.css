@@ -758,3 +758,46 @@ table.ledger.month-ledger th:last-child, table.ledger.month-ledger td:last-child
   .run-chips .chip { padding: 10px 10px; }
   .run-chips .chip b { font-size: 15px; }
 }
+
+/* ---------- 추이 정리(2026-11-09 밤): 접는 아카이브와 기준, 좁은 폭 습관 표, 담금질 입력 패널 ---------- */
+.archive-fold, .note-fold { margin-top: 28px; }
+.note-fold { margin-top: 6px; }
+.archive-fold > summary, .note-fold > summary { list-style: none; cursor: pointer; -webkit-user-select: none; user-select: none; }
+.archive-fold > summary::-webkit-details-marker, .note-fold > summary::-webkit-details-marker { display: none; }
+.archive-fold > summary {
+  display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 16px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+}
+.archive-fold > summary span { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; }
+.archive-fold > summary small { font-size: 12px; color: var(--faint); }
+.archive-fold > summary::after, .note-fold > summary::after { content: '›'; margin-left: auto; color: var(--faint); transition: transform .15s; }
+.archive-fold[open] > summary::after, .note-fold[open] > summary::after { transform: rotate(90deg); }
+.archive-fold .reflection-archive { margin-top: 14px; }
+.archive-fold .reflection-section-title { display: none; }
+.archive-fold { scroll-margin-top: 22px; }
+.note-fold > summary { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 4px; font-size: 12px; color: var(--muted); }
+.note-fold > summary::after { margin-left: 0; }
+
+.habit-section table.ledger.compact th, .habit-section table.ledger.compact td:not(:first-child) { white-space: nowrap; }
+@media (max-width: 360px) {
+  .habit-section table.ledger.compact { font-size: 12px; }
+  .habit-section table.ledger.compact th, .habit-section table.ledger.compact td { padding-left: 4px; padding-right: 4px; }
+  .habit-section table.ledger.compact th:first-child, .habit-section table.ledger.compact td:first-child { padding-left: 12px; }
+  .habit-section table.ledger.compact th:last-child, .habit-section table.ledger.compact td:last-child { padding-right: 12px; }
+}
+
+.ft-note { margin: 10px 0 0; font-size: 11px; line-height: 1.5; color: var(--faint); word-break: keep-all; }
+.forge-panel { display: flex; align-items: center; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+.forge-input {
+  flex: 1 1 140px; min-width: 0; min-height: 44px; padding: 0 12px; font: inherit; font-size: 16px; color: var(--text);
+  background: var(--surface2); border: 1px solid var(--line2); border-radius: 12px;
+}
+.forge-input:focus { outline: none; border-color: var(--red-line); }
+.forge-ask { flex: 1 1 140px; min-width: 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.forge-panel .btn { min-height: 44px; padding: 0 14px; font-size: 14px; }
+.forge-del { color: #8FB3FF; }
+.forge-link { margin-top: 4px; padding: 6px 0; min-height: 32px; background: none; border: 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--brass); cursor: pointer; }
+.run-confirm { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.run-confirm span { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); }
+.run-confirm .btn { min-height: 40px; padding: 0 12px; font-size: 13px; }
+.run-del { color: #8FB3FF; }

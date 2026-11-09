@@ -154,12 +154,19 @@ async function v2Scenario(browser, origin) {
   assert.equal(await page.locator('#forgeBlock .forge-row').count(), 4);
   assert.equal(await page.locator('#forgeBlock .forge-dday b').innerText(), 'D-52');
   const posBeforeForge = await page.locator('#posLine .pill').innerText();
-  await page.locator('#forgeBlock [data-forge="stk"] .forge-btn').click();   // prompt는 기본값('')으로 수락 → '완료'
-  assert.equal((await stored()).days['2026-11-09'].stk, '완료');
+  const dialogsBeforeForge = dialogs.length;
+  await page.locator('#forgeBlock [data-forge="stk"] .forge-btn').click();   // 줄 안 입력칸(폰 기본 팝업 없음)
+  await page.locator('#forgeBlock [data-forge="stk"] .forge-input').fill('TSMC');
+  await page.screenshot({ path: path.join(report, 'forge-panel-320.png') });
+  await page.locator('#forgeBlock [data-forge="stk"] .forge-input').press('Enter');
+  assert.equal((await stored()).days['2026-11-09'].stk, 'TSMC');
   assert.equal(await page.locator('#forgeBlock [data-forge="stk"] .forge-btn').innerText(), '기록됨');
   assert.equal(await page.locator('#posLine .pill').innerText(), posBeforeForge);
-  await page.locator('#forgeBlock [data-forge="stk"] .forge-btn').click();   // confirm 수락 → 지움
+  await page.locator('#forgeBlock [data-forge="stk"] .forge-btn').click();   // 지우기 확인 패널
+  await page.locator('#forgeBlock [data-forge="stk"] .forge-del').click();
   assert.equal((await stored()).days['2026-11-09'].stk, undefined);
+  assert.equal(dialogs.length, dialogsBeforeForge);
+  assert.equal(await page.locator('#forgeBlock [data-forge="fx"] .forge-link').count(), 1);
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 }); await noOverflow();
     await page.screenshot({ path: path.join(report, 'forge-today-' + width + '.png') });
@@ -243,6 +250,12 @@ async function v2Scenario(browser, origin) {
   assert.equal(await page.evaluate(() => document.querySelector('#screen-trends > section').id), 'forgeTrends');
   assert.equal(await page.locator('#forgeTrends .ft-row').count(), forgeActiveToday() ? 4 : 0);
   assert((await page.locator('#habitBody td:first-child').allInnerTexts()).includes('운동'));
+  // 320px에서 습관 표 머리글과 숫자가 한 줄(줄바꿈으로 높이가 늘지 않는다), 기준 설명은 접혀 있다
+  await page.setViewportSize({ width: 320, height: 844 });
+  assert.equal(await page.locator('.habit-section thead th').evaluateAll(ths => ths.every(th => th.getBoundingClientRect().height < 40)), true);
+  assert.equal(await page.locator('.habit-section .ledger-wrap').evaluate(w => w.scrollWidth <= w.clientWidth), true);
+  assert.equal(await page.locator('.habit-section .note-fold').evaluate(d => d.open), false);
+  await page.setViewportSize({ width: 390, height: 844 });
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 }); await noOverflow();
     await page.screenshot({ path: path.join(report, 'v2-trends-' + width + '.png'), fullPage: true });
@@ -474,6 +487,9 @@ async function botSyncScenario(browser, origin) {
     assert((await page.locator('.reflection-stats').innerText()).includes('50%'));
     await page.locator('#calGrid [data-day="' + date + '"]').click();
     assert((await page.locator('#reflectionDay').innerText()).includes(reason));
+    assert.equal(await page.locator('#archiveFold').evaluate(d => d.open), false);   // 아카이브는 맨 아래에 접혀 있다
+    await page.locator('.archive-jump').click();                                        // 'X 사유 전체 보기'가 펼치고 이동
+    assert.equal(await page.locator('#archiveFold').evaluate(d => d.open), true);
     assert.equal(await page.locator('#archiveEntries article').count(), 3);
     assert((await page.locator('#reflectionArchive').innerText()).includes(oldRecord.selfReason));
     await page.locator('#archiveSearch').fill('오래된');
@@ -583,8 +599,12 @@ async function botSyncScenario(browser, origin) {
       await page.screenshot({ path: path.join(report, 'run-' + width + '.png'), fullPage: true });
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    page.once('dialog', dialog => dialog.accept());
-    await page.locator('#runList .run-x').click();
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.locator('#runList .run-x').click();             // 줄 안 확인(폰 기본 창 없음)
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.screenshot({ path: path.join(report, 'run-confirm-320.png') });
+    await page.locator('#runList .run-del').click();
+    await page.setViewportSize({ width: 390, height: 844 });
     runStored = await page.evaluate(() => JSON.parse(localStorage.getItem('h2-routine-v1')));
     assert.equal(runStored.days[date].runs, undefined);
     await page.locator('[data-health="gym"]').click();

@@ -59,7 +59,7 @@ function renderCalendar(state, t, ym) {
       button.className = 'cal-cell combo ' + c.kind + ' self-' + (answer || 'none') + (c.ds === t ? ' today' : '');
       button.setAttribute('aria-label', c.ds + ', 루틴 ' + POSITION[c.kind] + ', 만족도 ' + (answer?.toUpperCase() || '미응답'));
       const date = document.createElement('span'); date.textContent = c.day;
-      const mark = document.createElement('b'); mark.textContent = answer?.toUpperCase() || '—';
+      const mark = document.createElement('b'); mark.textContent = answer?.toUpperCase() || ''; // 미응답은 비워 O, X가 보이게
       button.append(date, mark);
       button.addEventListener('click', () => showReflectionDay(state, c.ds, POSITION[c.kind]));
       grid.appendChild(button);

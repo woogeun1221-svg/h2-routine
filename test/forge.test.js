@@ -94,14 +94,27 @@ describe('27 담금질 블록 DOM', () => {
     expect(root.querySelector('[data-forge="wr"] .forge-status').textContent).toBe('11.9–11.22, 일요일까지 1편.');
     expect(root.querySelectorAll('[data-forge="fx"] .ft').length).toBe(53);
 
-    vi.stubGlobal('prompt', () => '  TSMC  ');
-    root.querySelector('[data-forge="stk"] .forge-btn').click();
+    const prompt = vi.fn(), confirm = vi.fn();
+    vi.stubGlobal('prompt', prompt); vi.stubGlobal('confirm', confirm);
+    root.querySelector('[data-forge="stk"] .forge-btn').click();       // 줄 안 입력칸
+    const inp = root.querySelector('[data-forge="stk"] .forge-input');
+    expect(document.activeElement).toBe(inp);
+    inp.value = '  TSMC  ';
+    root.querySelector('[data-forge="stk"] .forge-save').click();
     expect(setForge).toHaveBeenCalledWith('stk', 'TSMC');
+    root.querySelector('[data-forge="wr"] .forge-btn').click();         // 다른 줄을 열면 앞의 패널은 닫힌다
+    expect(root.querySelectorAll('.forge-panel').length).toBe(1);
+    root.querySelector('[data-forge="wr"] .forge-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(setForge).toHaveBeenCalledWith('wr', '완료');                // 빈 제목은 '완료'
+    root.querySelector('[data-forge="wr"] .forge-cancel').click();
+    expect(root.querySelectorAll('.forge-panel').length).toBe(0);
     root.querySelector('[data-forge="fx"] .forge-btn').click();
     expect(setForge).toHaveBeenCalledWith('fx', null);
-    vi.stubGlobal('confirm', () => true);
-    root.querySelector('[data-forge="bk"] .forge-btn').click();
+    root.querySelector('[data-forge="bk"] .forge-btn').click();         // 지우기는 확인 패널
+    expect(root.querySelector('[data-forge="bk"] .forge-ask').textContent).toContain('원칙');
+    root.querySelector('[data-forge="bk"] .forge-del').click();
     expect(setForge).toHaveBeenCalledWith('bk', null);
+    expect(prompt).not.toHaveBeenCalled(); expect(confirm).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
   it('운동 슬롯을 기록한 날은 운동 버튼이 잠긴 완료', () => {
@@ -109,6 +122,14 @@ describe('27 담금질 블록 DOM', () => {
     const b = document.querySelector('[data-forge="fx"] .forge-btn');
     expect(b.disabled).toBe(true);
     expect(b.textContent).toBe('슬롯 완료');
+  });
+  it('운동 줄의 런닝 기록 바로가기', () => {
+    const openRun = vi.fn();
+    renderForge(base({}), '2026-11-10', { setForge: vi.fn(), openRun }, '2026-11-10');
+    document.querySelector('[data-forge="fx"] .forge-link').click();
+    expect(openRun).toHaveBeenCalled();
+    renderForge(base({ '2026-11-10': { runs: [{ km: 3 }] } }), '2026-11-10', { setForge: vi.fn(), openRun }, '2026-11-10');
+    expect(document.querySelector('[data-forge="fx"] .forge-link')).toBe(null);   // 이미 뛴 날은 숨김
   });
   it('기간 밖 날짜에선 숨긴다', () => {
     renderForge(base({}), '2026-11-08', { setForge: vi.fn() }, '2026-11-08');

@@ -103,7 +103,11 @@ export function renderReflectionHistory(state, month, today) {
   root.appendChild(note);
   const jump = document.createElement('button');
   jump.className = 'reset archive-jump'; jump.textContent = 'X 사유 전체 보기 ↓';
-  jump.addEventListener('click', () => document.getElementById('reflectionArchive')?.scrollIntoView({ block: 'start' }));
+  jump.addEventListener('click', () => {
+    const fold = document.getElementById('archiveFold');
+    if (fold) fold.open = true;
+    (fold || document.getElementById('reflectionArchive'))?.scrollIntoView({ block: 'start' });
+  });
   root.appendChild(jump);
 
   const rows = reflectionMonths(state, today);

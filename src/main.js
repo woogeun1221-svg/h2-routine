@@ -319,6 +319,7 @@ function renderHealth() {
   if (healthMode === 'gym') mountIronTab();
   else renderRun(state, todayStr(), { addRun: addRun, removeRun: removeRun });
 }
+function openRun() { healthMode = 'run'; try { localStorage.setItem(HEALTH_MODE_KEY, healthMode); } catch (e) {} switchTab('iron'); }
 function addRun(ds, run) {
   var d = ensureDay(ds);
   d.runs = (Array.isArray(d.runs) ? d.runs : []).concat([run]);
@@ -361,7 +362,7 @@ function switchTab(tab) {
 
 function todayHandlers() {
   return {
-    addVal: addVal, undoVal: undoVal, setDirect: setDirect, toggleW: toggleW, toggleCheck: toggleCheck, setForge: setForge,
+    addVal: addVal, undoVal: undoVal, setDirect: setDirect, toggleW: toggleW, toggleCheck: toggleCheck, setForge: setForge, openRun: openRun,
     setReflection: setReflection, setReflectionReason: setReflectionReason,
     toggleWeekly: toggleWeekly, toggleSlot: toggleSlot, selectDay: selectDay, undoStack: undoStack
   };

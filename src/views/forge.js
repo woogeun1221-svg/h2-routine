@@ -1,5 +1,6 @@
 /* 27 담금질 블록 — 오늘 화면 맨 위. 보는 날(day)에 기록을 남기고, 구간 판정은 오늘(t) 기준이다.
-   h.setForge(key, value): 글 항목은 제목 문자열 또는 null, 운동은 true 또는 null. */
+   h.setForge(key, value): 글 항목은 제목 문자열 또는 null, 운동은 true 또는 null. h.openRun(): 헬스 탭 런닝 화면으로.
+   2026-11-09: 제목 입력과 지우기 확인을 prompt, confirm 대신 줄 안 패널로. */
 import { weekday } from '../logic.js';
 import { FORGE, FORGE_ITEMS, FORGE_TITLE_MAX, forgeActive, forgeDaysLeft, forgeItemStatus, forgeMark } from '../forge.js';
 
@@ -50,6 +51,11 @@ function forgeRow(state, t, h, day, item) {
   var status = document.createElement('div'); status.className = 'forge-status';
   status.textContent = statusText(item, st, mark, day === t);
   main.append(line, status);
+  if (item.key === 'fx' && mark !== 'run' && h.openRun) {
+    var go = document.createElement('button'); go.type = 'button'; go.className = 'forge-link'; go.textContent = '런닝 기록 →';
+    go.addEventListener('click', function () { h.openRun(); });
+    main.appendChild(go);
+  }
 
   var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn forge-btn';
   if (item.key === 'fx') {
@@ -65,16 +71,33 @@ function forgeRow(state, t, h, day, item) {
     btn.textContent = '기록됨'; btn.classList.add('sel-o');
     btn.setAttribute('aria-pressed', 'true');
     btn.addEventListener('click', function () {
-      if (confirm(item.name + ' 기록 "' + mark + '"을 지울까?')) h.setForge(item.key, null);
+      openPanel(row, function (panel) {
+        var q = document.createElement('span'); q.className = 'forge-ask';
+        q.textContent = '"' + mark + '" 기록을 지울까?';
+        var del = document.createElement('button'); del.type = 'button'; del.className = 'btn forge-del'; del.textContent = '지우기';
+        del.addEventListener('click', function () { h.setForge(item.key, null); });
+        panel.append(q, del, cancelBtn(row));
+        return del;
+      });
     });
   } else {
     btn.textContent = st.phase === 'done' ? '+ 더' : '기록';
     btn.setAttribute('aria-pressed', 'false');
     btn.addEventListener('click', function () {
-      var inp = prompt(item.ask, '');
-      if (inp === null) return;
-      var v = inp.trim().slice(0, FORGE_TITLE_MAX) || '완료';
-      h.setForge(item.key, v);
+      openPanel(row, function (panel) {
+        var inp = document.createElement('input'); inp.type = 'text'; inp.className = 'forge-input';
+        inp.maxLength = FORGE_TITLE_MAX; inp.placeholder = item.ask; inp.enterKeyHint = 'done'; inp.autocomplete = 'off';
+        inp.setAttribute('aria-label', item.ask);
+        var ok = document.createElement('button'); ok.type = 'button'; ok.className = 'btn forge-save'; ok.textContent = '저장';
+        function commit() { h.setForge(item.key, inp.value.trim().slice(0, FORGE_TITLE_MAX) || '완료'); }
+        ok.addEventListener('click', commit);
+        inp.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') closePanel(row);
+        });
+        panel.append(inp, ok, cancelBtn(row));
+        return inp;
+      });
     });
   }
 
@@ -82,6 +105,22 @@ function forgeRow(state, t, h, day, item) {
   top.append(main, btn);
   row.append(top, track(st, day));
   return row;
+}
+
+/* 기록 입력과 지우기 확인은 폰 기본 팝업 대신 그 줄 아래에서 연다(한 번에 하나). */
+function openPanel(row, fill) {
+  var block = row.parentElement;
+  block.querySelectorAll('.forge-panel').forEach(function (p) { p.remove(); });
+  var panel = document.createElement('div'); panel.className = 'forge-panel';
+  var focus = fill(panel);
+  row.querySelector('.forge-top').after(panel);
+  if (focus) focus.focus();
+}
+function closePanel(row) { var p = row.querySelector('.forge-panel'); if (p) p.remove(); }
+function cancelBtn(row) {
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'btn ghost forge-cancel'; b.textContent = '취소';
+  b.addEventListener('click', function () { closePanel(row); });
+  return b;
 }
 
 function statusText(item, st, mark, isToday) {

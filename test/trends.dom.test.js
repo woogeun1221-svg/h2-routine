@@ -61,7 +61,7 @@ describe('renderTrends DOM 스모크', () => {
     const cells = document.querySelectorAll('#calGrid button');
     expect(cells[0].textContent).toBe('20X');
     expect(cells[1].textContent).toBe('21O');
-    expect(cells[2].textContent).toBe('22—');
+    expect(cells[2].textContent).toBe('22');
     cells[0].click();
     expect(document.getElementById('reflectionDay').hidden).toBe(false);
     expect(document.getElementById('reflectionDay').textContent).toContain('횟수는 채웠지만 만족하지 못함');

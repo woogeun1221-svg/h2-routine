@@ -105,10 +105,10 @@ describe('런닝 화면', () => {
     expect(document.querySelector('#runList li').textContent).toContain("5'30\"");
     expect(document.querySelector('.run-chips').textContent).toContain('5km');
     expect(document.querySelectorAll('#runBars .run-bar').length).toBe(8);
-    vi.stubGlobal('confirm', () => true);
     document.querySelector('#runList .run-x').click();
+    expect(h.removeRun).not.toHaveBeenCalled();
+    document.querySelector('#runList .run-del').click();
     expect(h.removeRun).toHaveBeenCalledWith('2026-11-09', 0);
-    vi.unstubAllGlobals();
   });
   it('거리 없이 누르면 기록하지 않고 안내', () => {
     const h = { addRun: vi.fn(), removeRun: vi.fn() };
@@ -139,5 +139,6 @@ describe('합친 캘린더', () => {
     const detail = document.getElementById('reflectionDay').textContent;
     expect(detail).toContain('루틴 정상');
     expect(detail).toContain('만족도 X');
+    expect(document.querySelector('#calGrid button[data-day="2026-07-21"] b').textContent).toBe('');   // 미응답은 빈칸
   });
 });

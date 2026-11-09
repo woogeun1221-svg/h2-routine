@@ -136,8 +136,15 @@ export function renderRun(state, t, h) {
     var p = document.createElement('span'); p.className = 'num run-p'; p.textContent = paceText(r.km, r.min);
     var x = document.createElement('button'); x.type = 'button'; x.className = 'run-x'; x.textContent = '×';
     x.setAttribute('aria-label', md(r.ds) + ' ' + km1(r.km) + 'km 기록 삭제');
-    x.addEventListener('click', function () {
-      if (confirm(md(r.ds) + ' ' + km1(r.km) + 'km 기록을 지울까?')) h.removeRun(r.ds, r.i);
+    x.addEventListener('click', function () {   // 폰 기본 확인 창 대신 그 줄 아래에서 확인
+      ul.querySelectorAll('.run-confirm').forEach(function (n) { n.remove(); });
+      var box = document.createElement('div'); box.className = 'run-confirm';
+      var q = document.createElement('span'); q.textContent = md(r.ds) + ' ' + km1(r.km) + 'km 기록을 지울까?';
+      var del = document.createElement('button'); del.type = 'button'; del.className = 'btn run-del'; del.textContent = '지우기';
+      del.addEventListener('click', function () { h.removeRun(r.ds, r.i); });
+      var no = document.createElement('button'); no.type = 'button'; no.className = 'btn ghost'; no.textContent = '취소';
+      no.addEventListener('click', function () { box.remove(); });
+      box.append(q, del, no); li.appendChild(box); del.focus();
     });
     li.append(d, k, tm, p, x); ul.appendChild(li);
   });

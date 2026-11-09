@@ -43,7 +43,7 @@ export function renderForgeTrends(state, t) {
   var dd = document.createElement('div'); dd.className = 'forge-dday num';
   var left = forgeDaysLeft(t);
   var big = document.createElement('b'); big.textContent = left > 0 ? 'D-' + left : (left === 0 ? 'D-DAY' : '종료');
-  var small = document.createElement('small'); small.textContent = '달성률은 끝난 구간 기준';
+  var small = document.createElement('small'); small.textContent = md(FORGE.end) + ' 마감';
   dd.append(big, small);
   head.append(title, dd);
   root.appendChild(head);
@@ -51,6 +51,9 @@ export function renderForgeTrends(state, t) {
   var rows = document.createElement('div'); rows.className = 'forge-rows';
   FORGE_ITEMS.forEach(function (item) { rows.appendChild(summaryRow(state, t, item)); });
   root.appendChild(rows);
+  var note = document.createElement('p'); note.className = 'ft-note';
+  note.textContent = '달성률 = 끝난 구간 중 완료한 비율. 진행 중인 구간은 완료하면 들어간다.';
+  root.appendChild(note);
 }
 
 function summaryRow(state, t, item) {
